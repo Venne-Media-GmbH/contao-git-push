@@ -1,0 +1,6 @@
+vm_git_push_index:
+    path: /contao/git-push
+    controller: VennMedia\VmGitPushBundle\Controller\GitPushController::index
+    methods: [GET, POST]
+    defaults:
+        _scope: backend

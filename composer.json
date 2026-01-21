@@ -1,0 +1,25 @@
+{
+    "name": "venne-media/contao-git-push",
+    "description": "Git Push Bundle fuer Contao 5.3 - Verwalten Sie Git Repositories direkt aus dem Backend. By venne-media.de",
+    "version": "1.0.0",
+    "type": "contao-bundle",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Venne Media GmbH",
+            "homepage": "https://venne-media.de"
+        }
+    ],
+    "require": {
+        "php": ">=8.2",
+        "contao/core-bundle": "^5.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "VennMedia\\VmGitPushBundle\\": "src/"
+        }
+    },
+    "extra": {
+        "contao-manager-plugin": "VennMedia\\VmGitPushBundle\\ContaoManager\\Plugin"
+    }
+}

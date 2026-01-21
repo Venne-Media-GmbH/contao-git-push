@@ -1,0 +1,12 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    VennMedia\VmGitPushBundle\Service\GitService: ~
+
+    VennMedia\VmGitPushBundle\Controller\GitPushController:
+        tags: ['controller.service_arguments']
+
+    VennMedia\VmGitPushBundle\Backend\GitPushModule:
+        public: true

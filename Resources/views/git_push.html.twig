@@ -1,0 +1,1063 @@
+{% extends "@Contao/be_main.html.twig" %}
+
+{% block headline %}
+    Git - by venne-media.de
+{% endblock %}
+
+{% block main %}
+<div class="tl_listing_container" style="width: 100%; max-width: none;">
+    <style>
+        .vm-git-push {
+            padding: 20px;
+            width: 100%;
+            box-sizing: border-box;
+            color: #fff;
+        }
+        .vm-git-push h2 {
+            margin: 0 0 15px 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #555;
+            color: #fff;
+            font-size: 18px;
+        }
+        .vm-git-push p {
+            color: #ccc;
+        }
+        .vm-git-push .form-group {
+            margin-bottom: 15px;
+        }
+        .vm-git-push label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #fff;
+        }
+        .vm-git-push input[type="text"],
+        .vm-git-push input[type="email"],
+        .vm-git-push textarea,
+        .vm-git-push select {
+            width: 100%;
+            max-width: 500px;
+            padding: 8px 12px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            font-size: 14px;
+            background: #2a2a2a;
+            color: #fff;
+        }
+        .vm-git-push input[type="text"]::placeholder,
+        .vm-git-push input[type="email"]::placeholder,
+        .vm-git-push textarea::placeholder {
+            color: #888;
+        }
+        .vm-git-push textarea {
+            min-height: 60px;
+            resize: vertical;
+        }
+        .vm-git-push select option {
+            background: #2a2a2a;
+            color: #fff;
+        }
+        .vm-git-push .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            margin: 3px 3px 3px 0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            text-decoration: none;
+        }
+        .vm-git-push .btn-primary {
+            background: #589b0e;
+            color: white;
+        }
+        .vm-git-push .btn-primary:hover {
+            background: #6ab516;
+        }
+        .vm-git-push .btn-secondary {
+            background: #555;
+            color: white;
+        }
+        .vm-git-push .btn-secondary:hover {
+            background: #666;
+        }
+        .vm-git-push .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+        .vm-git-push .btn-info:hover {
+            background: #1fc8e3;
+        }
+        .vm-git-push .btn-danger {
+            background: #8b0000;
+            color: white;
+        }
+        .vm-git-push .btn-danger:hover {
+            background: #a00;
+        }
+        .vm-git-push .btn-success {
+            background: #2e6930;
+            color: white;
+        }
+        .vm-git-push .btn-success:hover {
+            background: #3a8a3a;
+        }
+        .vm-git-push .btn-warning {
+            background: #b8860b;
+            color: white;
+        }
+        .vm-git-push .btn-warning:hover {
+            background: #d4a017;
+        }
+        .vm-git-push .btn-small {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+        .vm-git-push .alert {
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .vm-git-push .alert-success {
+            background: #1e4620;
+            color: #75d979;
+            border: 1px solid #2e6930;
+        }
+        .vm-git-push .alert-error {
+            background: #4a1c1c;
+            color: #f5a5a5;
+            border: 1px solid #6b2b2b;
+        }
+        .vm-git-push .alert-info {
+            background: #1a3a4a;
+            color: #7dd3e8;
+            border: 1px solid #2a5a6a;
+        }
+        .vm-git-push .alert-warning {
+            background: #4a3a1a;
+            color: #f0d080;
+            border: 1px solid #6a5a2a;
+        }
+        .vm-git-push .output-box {
+            background: #0d0d0d;
+            color: #0f0;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            border: 1px solid #333;
+        }
+        .vm-git-push .info-box {
+            background: #2a2a2a;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 12px;
+            border: 1px solid #444;
+            color: #ccc;
+        }
+        .vm-git-push .info-box strong {
+            color: #fff;
+        }
+        .vm-git-push .hint {
+            font-size: 11px;
+            color: #888;
+            margin-top: 3px;
+        }
+
+        /* SSH Key Bar - kompakt oben */
+        .vm-git-push .ssh-bar {
+            background: #1a2a1a;
+            border: 1px solid #2a4a2a;
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .vm-git-push .ssh-bar .ssh-label {
+            color: #7d7;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .vm-git-push .ssh-bar .ssh-status {
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+        .vm-git-push .ssh-bar .ssh-status.active {
+            background: #2e6930;
+            color: #7d7;
+        }
+        .vm-git-push .ssh-bar .ssh-status.inactive {
+            background: #4a3a1a;
+            color: #f0d080;
+        }
+        .vm-git-push .ssh-bar .ssh-key-preview {
+            background: #0d0d0d;
+            color: #7d7;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 10px;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        .vm-git-push .ssh-bar .ssh-key-preview:hover {
+            max-width: none;
+            position: absolute;
+            z-index: 100;
+            background: #0d0d0d;
+            border: 1px solid #2a4a2a;
+        }
+        .vm-git-push .ssh-bar .ssh-actions {
+            display: flex;
+            gap: 5px;
+            margin-left: auto;
+        }
+
+        /* Main Layout - Side by Side */
+        .vm-git-push .main-layout {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        .vm-git-push .left-panel {
+            flex: 1;
+            min-width: 0;
+        }
+        .vm-git-push .right-panel {
+            width: 380px;
+            flex-shrink: 0;
+        }
+        @media (max-width: 1000px) {
+            .vm-git-push .main-layout {
+                flex-direction: column;
+            }
+            .vm-git-push .right-panel {
+                width: 100%;
+            }
+        }
+
+        /* Status Section */
+        .vm-git-push .status-section {
+            background: #2a2a2a;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            border: 1px solid #444;
+        }
+        .vm-git-push .status-section h3 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #fff;
+        }
+        .vm-git-push .file-list {
+            margin: 3px 0 10px 0;
+            padding-left: 18px;
+            font-size: 12px;
+        }
+        .vm-git-push .file-list li {
+            margin: 2px 0;
+            font-family: monospace;
+        }
+        .vm-git-push .file-modified { color: #f0ad4e; }
+        .vm-git-push .file-added { color: #5cb85c; }
+        .vm-git-push .file-deleted { color: #d9534f; }
+        .vm-git-push .file-untracked { color: #999; }
+
+        /* Commit Info */
+        .vm-git-push .commit-info {
+            background: #1a2a3a;
+            border: 1px solid #2a4a6a;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            color: #aaccee;
+            font-size: 12px;
+        }
+        .vm-git-push .commit-info strong {
+            color: #fff;
+        }
+        .vm-git-push .commit-info code {
+            background: #0a1a2a;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #7dd3e8;
+        }
+
+        /* Button Group */
+        .vm-git-push .button-group {
+            margin-top: 15px;
+            padding-top: 12px;
+            border-top: 1px solid #444;
+        }
+
+        /* History Section */
+        .vm-git-push .history-section {
+            background: #1a1a2e;
+            border: 1px solid #3a3a5e;
+            padding: 12px;
+            border-radius: 4px;
+            height: fit-content;
+            max-height: calc(100vh - 200px);
+            display: flex;
+            flex-direction: column;
+        }
+        .vm-git-push .history-section h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #aaccff;
+        }
+        .vm-git-push .commit-list {
+            overflow-y: auto;
+            flex: 1;
+        }
+        .vm-git-push .commit-item {
+            background: #252540;
+            border: 1px solid #3a3a5e;
+            border-radius: 4px;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            transition: background 0.2s;
+        }
+        .vm-git-push .commit-item:hover {
+            background: #2a2a50;
+        }
+        .vm-git-push .commit-current {
+            border-color: #5cb85c;
+            background: #1a2a1a;
+        }
+        .vm-git-push .commit-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+            flex-wrap: wrap;
+        }
+        .vm-git-push .commit-hash {
+            background: #0a1a2a;
+            color: #7dd3e8;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11px;
+        }
+        .vm-git-push .commit-date {
+            color: #888;
+            font-size: 10px;
+        }
+        .vm-git-push .commit-badge {
+            background: #5cb85c;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: bold;
+        }
+        .vm-git-push .commit-message {
+            color: #ddd;
+            font-size: 12px;
+            margin-bottom: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .vm-git-push .commit-author {
+            color: #888;
+            font-size: 10px;
+        }
+        .vm-git-push .commit-action {
+            margin-top: 6px;
+        }
+
+        /* Config Section */
+        .vm-git-push .config-section {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            border: 1px solid #444;
+        }
+        .vm-git-push .config-section h3 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            color: #fff;
+        }
+        .vm-git-push .form-row {
+            display: flex;
+            gap: 15px;
+        }
+        .vm-git-push .form-row .form-group {
+            flex: 1;
+        }
+
+        /* Sync Status Bar */
+        .vm-git-push .sync-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 8px 12px;
+            background: #1a2a3a;
+            border: 1px solid #2a4a6a;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .vm-git-push .sync-badge {
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .vm-git-push .sync-badge.synced {
+            background: #2e6930;
+            color: #7d7;
+        }
+        .vm-git-push .sync-badge.behind {
+            background: #8b4513;
+            color: #ffd;
+        }
+        .vm-git-push .sync-badge.ahead {
+            background: #1a5a8a;
+            color: #adf;
+        }
+
+        /* Branch Section */
+        .vm-git-push .branch-section {
+            background: #2a2a3a;
+            border: 1px solid #3a3a5a;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .vm-git-push .branch-section h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #aaccff;
+        }
+        .vm-git-push .branch-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        .vm-git-push .branch-tag {
+            padding: 4px 10px;
+            background: #252540;
+            border: 1px solid #3a3a5e;
+            border-radius: 3px;
+            font-size: 12px;
+            color: #aaccff;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .vm-git-push .branch-tag:hover {
+            background: #3a3a60;
+        }
+        .vm-git-push .branch-tag.active {
+            background: #2e6930;
+            border-color: #5cb85c;
+            color: #7d7;
+        }
+        .vm-git-push .branch-create {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #3a3a5a;
+        }
+        .vm-git-push .branch-create input {
+            flex: 1;
+            max-width: 200px;
+        }
+
+        /* Tab Navigation */
+        .vm-git-push .tab-nav {
+            display: flex;
+            gap: 0;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #444;
+        }
+        .vm-git-push .tab-btn {
+            padding: 10px 20px;
+            background: transparent;
+            border: none;
+            color: #888;
+            font-size: 14px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: color 0.2s;
+        }
+        .vm-git-push .tab-btn:hover {
+            color: #fff;
+        }
+        .vm-git-push .tab-btn.active {
+            color: #589b0e;
+            border-bottom-color: #589b0e;
+        }
+        .vm-git-push .tab-content {
+            display: none;
+        }
+        .vm-git-push .tab-content.active {
+            display: block;
+        }
+
+        /* Footer Credit */
+        .vm-git-push .footer-credit {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #333;
+            text-align: center;
+            color: #666;
+            font-size: 11px;
+        }
+        .vm-git-push .footer-credit a {
+            color: #589b0e;
+            text-decoration: none;
+        }
+        .vm-git-push .footer-credit a:hover {
+            text-decoration: underline;
+        }
+    </style>
+
+    <div class="vm-git-push">
+        {% if message %}
+            <div class="alert alert-{{ messageType }}">
+                {{ message }}
+            </div>
+        {% endif %}
+
+        {% if output %}
+            <div class="output-box">{{ output }}</div>
+        {% endif %}
+
+        <div class="info-box">
+            <strong>Projekt:</strong> {{ projectRoot }}
+        </div>
+
+        {# SSH Key Bar - kompakt oben wenn vorhanden #}
+        {% if isGitRepo and hasRemote %}
+        <div class="ssh-bar">
+            <span class="ssh-label">SSH Key</span>
+            {% if hasSshKey %}
+                <span class="ssh-status active">Aktiv</span>
+                <span class="ssh-key-preview" title="Klicken zum Kopieren" onclick="navigator.clipboard.writeText('{{ sshPublicKey }}'); alert('Key kopiert!');">{{ sshPublicKey }}</span>
+                <div class="ssh-actions">
+                    {% if deployKeyUrl %}
+                        <a href="{{ deployKeyUrl }}" target="_blank" class="btn btn-small btn-success" style="text-decoration: none;">
+                            In GitHub eintragen
+                        </a>
+                    {% endif %}
+                    <form method="post" style="display: inline;">
+                        <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                        <input type="hidden" name="action" value="test_ssh">
+                        <button type="submit" class="btn btn-small btn-info">Testen</button>
+                    </form>
+                    <form method="post" style="display: inline;" onsubmit="return confirm('SSH Key loeschen?');">
+                        <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                        <input type="hidden" name="action" value="delete_ssh_key">
+                        <button type="submit" class="btn btn-small btn-danger">Loeschen</button>
+                    </form>
+                </div>
+            {% else %}
+                <span class="ssh-status inactive">Nicht vorhanden</span>
+                <form method="post" style="display: inline;">
+                    <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                    <input type="hidden" name="action" value="generate_ssh_key">
+                    <button type="submit" class="btn btn-small btn-success">SSH Key generieren</button>
+                </form>
+                <span class="hint">Wird fuer Push zu GitHub/GitLab benoetigt</span>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {# Git User Konfiguration wenn nicht gesetzt #}
+        {% if needsUserConfig is defined and needsUserConfig %}
+            <div class="alert alert-warning">
+                Git Benutzer ist nicht konfiguriert. Bitte zuerst die Benutzerdaten eingeben.
+            </div>
+
+            <div class="config-section">
+                <h3>Git Benutzer konfigurieren</h3>
+                <form method="post">
+                    <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                    <input type="hidden" name="action" value="config_user">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="git_user_name">Name *</label>
+                            <input type="text" id="git_user_name" name="git_user_name"
+                                   placeholder="Max Mustermann" value="{{ gitUserName|default('') }}" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="git_user_email">E-Mail *</label>
+                            <input type="email" id="git_user_email" name="git_user_email"
+                                   placeholder="max@example.com" value="{{ gitUserEmail|default('') }}" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Benutzer speichern</button>
+                </form>
+            </div>
+        {% endif %}
+
+        {# Fall 1: Kein Git Repository #}
+        {% if not isGitRepo %}
+            <h2>Git Repository einrichten</h2>
+            <p>In diesem Verzeichnis existiert noch kein Git Repository. Waehlen Sie eine Option:</p>
+
+            {# Tab Navigation #}
+            <div class="tab-nav">
+                <button type="button" class="tab-btn active" onclick="showTab('clone')">
+                    Bestehendes Repo klonen (empfohlen)
+                </button>
+                <button type="button" class="tab-btn" onclick="showTab('init')">
+                    Neues Repo erstellen
+                </button>
+            </div>
+
+            {# Clone Tab - Empfohlen #}
+            <div id="tab-clone" class="tab-content active">
+                <div class="alert alert-info">
+                    <strong>Empfohlen:</strong> Klonen Sie ein bestehendes Repository, um den aktuellen Stand vom Server zu holen.
+                </div>
+
+                <form method="post">
+                    <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                    <input type="hidden" name="action" value="clone">
+
+                    <div class="form-group">
+                        <label for="clone_remote_url">Remote URL (SSH) *</label>
+                        <input type="text" id="clone_remote_url" name="remote_url"
+                               placeholder="git@github.com:user/repo.git" required>
+                        <div class="hint">Beispiel: git@github.com:username/repository.git</div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="clone_git_user_name">Git Benutzer Name *</label>
+                            <input type="text" id="clone_git_user_name" name="git_user_name"
+                                   placeholder="Max Mustermann" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="clone_git_user_email">Git Benutzer E-Mail *</label>
+                            <input type="email" id="clone_git_user_email" name="git_user_email"
+                                   placeholder="max@example.com" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="clone_branch">Branch Name</label>
+                        <input type="text" id="clone_branch" name="branch" value="main" placeholder="main">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Repository klonen</button>
+                </form>
+            </div>
+
+            {# Init Tab - Neues Repo #}
+            <div id="tab-init" class="tab-content">
+                <div class="alert alert-warning">
+                    <strong>Hinweis:</strong> Dies erstellt ein neues, leeres Repository. Verwenden Sie dies nur, wenn Sie ein neues Projekt starten.
+                </div>
+
+                <form method="post">
+                    <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                    <input type="hidden" name="action" value="init">
+
+                    <div class="form-group">
+                        <label for="init_remote_url">Remote URL (SSH oder HTTPS) *</label>
+                        <input type="text" id="init_remote_url" name="remote_url"
+                               placeholder="git@github.com:user/repo.git" required>
+                        <div class="hint">Beispiel: git@github.com:username/repository.git</div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="init_git_user_name">Git Benutzer Name *</label>
+                            <input type="text" id="init_git_user_name" name="git_user_name"
+                                   placeholder="Max Mustermann" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="init_git_user_email">Git Benutzer E-Mail *</label>
+                            <input type="email" id="init_git_user_email" name="git_user_email"
+                                   placeholder="max@example.com" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="init_branch">Branch Name</label>
+                        <input type="text" id="init_branch" name="branch" value="main" placeholder="main">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Repository initialisieren</button>
+                </form>
+            </div>
+
+            <script>
+            function showTab(tabName) {
+                // Hide all tabs
+                document.querySelectorAll('.tab-content').forEach(function(tab) {
+                    tab.classList.remove('active');
+                });
+                document.querySelectorAll('.tab-btn').forEach(function(btn) {
+                    btn.classList.remove('active');
+                });
+                // Show selected tab
+                document.getElementById('tab-' + tabName).classList.add('active');
+                event.target.classList.add('active');
+            }
+            </script>
+
+        {# Fall 2: Git Repository ohne Remote #}
+        {% elseif not hasRemote %}
+            <h2>Remote hinzufuegen</h2>
+            <p>Git Repository vorhanden, aber kein Remote konfiguriert.</p>
+
+            <form method="post">
+                <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                <input type="hidden" name="action" value="add_remote">
+
+                <div class="form-group">
+                    <label for="remote_url">Remote URL *</label>
+                    <input type="text" id="remote_url" name="remote_url"
+                           placeholder="git@github.com:user/repo.git" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Remote hinzufuegen</button>
+            </form>
+
+        {# Fall 3: Vollstaendiges Git Repository - Side by Side Layout #}
+        {% else %}
+            <div class="main-layout">
+                {# Linke Seite: Commit & Push #}
+                <div class="left-panel">
+                    <h2>Git Verwaltung</h2>
+
+                    {# Repository Info mit Edit-Moeglichkeit #}
+                    <div class="info-box" style="position: relative;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div>
+                                <div><strong>Remote:</strong> <span id="remote-url-display">{{ remoteUrl }}</span></div>
+                                <div><strong>Branch:</strong> {{ currentBranch }}
+                                {% if gitUserName is defined and gitUserName %}
+                                    | <strong>User:</strong> {{ gitUserName }}
+                                {% endif %}
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-small btn-secondary" onclick="toggleRemoteEdit()">Aendern</button>
+                        </div>
+                        <div id="remote-edit-form" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid #444;">
+                            <form method="post" style="display: flex; gap: 8px; align-items: flex-end;">
+                                <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                                <input type="hidden" name="action" value="change_remote_url">
+                                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                    <label for="new_remote_url" style="font-size: 11px;">Neue Remote URL</label>
+                                    <input type="text" id="new_remote_url" name="remote_url" value="{{ remoteUrl }}" style="max-width: none;">
+                                </div>
+                                <button type="submit" class="btn btn-small btn-primary">Speichern</button>
+                                <button type="button" class="btn btn-small btn-secondary" onclick="toggleRemoteEdit()">Abbrechen</button>
+                            </form>
+                        </div>
+                    </div>
+                    <script>
+                    function toggleRemoteEdit() {
+                        var form = document.getElementById('remote-edit-form');
+                        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+                    }
+                    </script>
+
+                    {# Sync Status Bar #}
+                    {% if remoteStatus is defined %}
+                    <div class="sync-bar">
+                        <strong style="color: #7dd3e8;">Sync Status:</strong>
+                        {% if remoteStatus.synced %}
+                            <span class="sync-badge synced">Synchronisiert</span>
+                        {% else %}
+                            {% if remoteStatus.behind > 0 %}
+                                <span class="sync-badge behind">{{ remoteStatus.behind }} Commits hinter Remote</span>
+                                <form method="post" style="display: inline;">
+                                    <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                                    <input type="hidden" name="action" value="pull">
+                                    <button type="submit" class="btn btn-small btn-warning">Jetzt Pull</button>
+                                </form>
+                            {% endif %}
+                            {% if remoteStatus.ahead > 0 %}
+                                <span class="sync-badge ahead">{{ remoteStatus.ahead }} Commits vor Remote</span>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {# Branch Management Section #}
+                    <div class="branch-section">
+                        <h3>Branches <button type="button" class="btn btn-small btn-secondary" onclick="toggleBranchOptions()" style="margin-left: 10px; font-size: 10px;">Optionen</button></h3>
+                        <div class="branch-list">
+                            {% set shownBranches = [] %}
+                            {# Zuerst alle lokalen Branches anzeigen #}
+                            {% for branch in branches %}
+                                {% if branch == currentBranch %}
+                                    <span class="branch-tag active">{{ branch }} (aktiv)</span>
+                                {% else %}
+                                    <form method="post" style="display: inline;">
+                                        <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                                        <input type="hidden" name="action" value="switch_branch">
+                                        <input type="hidden" name="branch" value="{{ branch }}">
+                                        <button type="submit" class="branch-tag">{{ branch }}</button>
+                                    </form>
+                                {% endif %}
+                                {% set shownBranches = shownBranches|merge([branch]) %}
+                            {% endfor %}
+                            {# Dann Remote-Branches die noch nicht lokal sind #}
+                            {% if remoteBranches is defined %}
+                                {% for branch in remoteBranches %}
+                                    {% if branch not in shownBranches %}
+                                        <form method="post" style="display: inline;">
+                                            <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                                            <input type="hidden" name="action" value="switch_branch">
+                                            <input type="hidden" name="branch" value="{{ branch }}">
+                                            <button type="submit" class="branch-tag" style="border-style: dashed;" title="Remote Branch">{{ branch }}</button>
+                                        </form>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        {# Branch Optionen (versteckt) #}
+                        <div id="branch-options" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid #3a3a5a;">
+                            {# Neuer Branch #}
+                            <div style="margin-bottom: 10px;">
+                                <strong style="color: #aaccff; font-size: 12px;">Neuer Branch erstellen:</strong>
+                                <form method="post" style="display: flex; gap: 8px; margin-top: 5px;">
+                                    <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                                    <input type="hidden" name="action" value="create_branch">
+                                    <input type="text" name="branch_name" placeholder="feature/neuer-branch" style="flex: 1; max-width: 200px;">
+                                    <button type="submit" class="btn btn-small btn-success">Erstellen</button>
+                                </form>
+                            </div>
+
+                            {# Branch umbenennen #}
+                            <div style="margin-bottom: 10px;">
+                                <strong style="color: #aaccff; font-size: 12px;">Aktuellen Branch umbenennen:</strong>
+                                <form method="post" style="display: flex; gap: 8px; margin-top: 5px;">
+                                    <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                                    <input type="hidden" name="action" value="rename_branch">
+                                    <input type="hidden" name="old_branch_name" value="{{ currentBranch }}">
+                                    <input type="text" name="new_branch_name" placeholder="Neuer Name" style="flex: 1; max-width: 200px;">
+                                    <button type="submit" class="btn btn-small btn-warning">Umbenennen</button>
+                                </form>
+                            </div>
+
+                            {# Branch loeschen #}
+                            {% if branches|length > 1 %}
+                            <div>
+                                <strong style="color: #aaccff; font-size: 12px;">Branch loeschen:</strong>
+                                <form method="post" style="display: flex; gap: 8px; margin-top: 5px;" onsubmit="return confirm('Branch wirklich loeschen? Dies kann nicht rueckgaengig gemacht werden!');">
+                                    <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                                    <input type="hidden" name="action" value="delete_branch">
+                                    <select name="branch_name" style="flex: 1; max-width: 200px;">
+                                        {% for branch in branches %}
+                                            {% if branch != currentBranch %}
+                                                <option value="{{ branch }}">{{ branch }}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" class="btn btn-small btn-danger">Loeschen</button>
+                                </form>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        {# Kompakter "Neuer Branch" Link wenn Optionen versteckt #}
+                        <div id="branch-quick-create" class="branch-create">
+                            <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                            <input type="hidden" name="action" value="create_branch">
+                            <form method="post" style="display: flex; gap: 8px;">
+                                <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                                <input type="hidden" name="action" value="create_branch">
+                                <input type="text" name="branch_name" placeholder="feature/neuer-branch">
+                                <button type="submit" class="btn btn-small btn-success">Neuer Branch</button>
+                            </form>
+                        </div>
+                    </div>
+                    <script>
+                    function toggleBranchOptions() {
+                        var opts = document.getElementById('branch-options');
+                        var quick = document.getElementById('branch-quick-create');
+                        if (opts.style.display === 'none') {
+                            opts.style.display = 'block';
+                            quick.style.display = 'none';
+                        } else {
+                            opts.style.display = 'none';
+                            quick.style.display = 'flex';
+                        }
+                    }
+                    </script>
+
+                    {# Letzter Commit #}
+                    {% if lastCommit.success %}
+                        <div class="commit-info">
+                            <strong>Letzter Commit:</strong>
+                            <code>{{ lastCommit.shortHash }}</code> - {{ lastCommit.message }}
+                        </div>
+                    {% endif %}
+
+                    {# Status-Anzeige #}
+                    {% if status.hasChanges %}
+                        <div class="status-section">
+                            <h3>Geaenderte Dateien</h3>
+                            {% if status.changes.modified %}
+                                <strong class="file-modified">Geaendert:</strong>
+                                <ul class="file-list">
+                                    {% for file in status.changes.modified %}
+                                        <li class="file-modified">{{ file }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            {% if status.changes.added %}
+                                <strong class="file-added">Staged:</strong>
+                                <ul class="file-list">
+                                    {% for file in status.changes.added %}
+                                        <li class="file-added">{{ file }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            {% if status.changes.deleted %}
+                                <strong class="file-deleted">Geloescht:</strong>
+                                <ul class="file-list">
+                                    {% for file in status.changes.deleted %}
+                                        <li class="file-deleted">{{ file }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            {% if status.changes.untracked %}
+                                <strong class="file-untracked">Neu:</strong>
+                                <ul class="file-list">
+                                    {% for file in status.changes.untracked %}
+                                        <li class="file-untracked">{{ file }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            Keine Aenderungen. Arbeitsverzeichnis ist sauber.
+                        </div>
+                    {% endif %}
+
+                    {# Commit & Push Formular #}
+                    <form method="post">
+                        <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                        <input type="hidden" name="action" value="commit_push">
+
+                        <div class="form-group">
+                            <label for="commit_message">Commit-Nachricht *</label>
+                            <textarea id="commit_message" name="commit_message"
+                                      placeholder="Beschreiben Sie Ihre Aenderungen..." required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="push_branch">Push nach Branch</label>
+                            <select id="push_branch" name="branch">
+                                {% for branch in branches %}
+                                    <option value="{{ branch }}" {% if branch == currentBranch %}selected{% endif %}>
+                                        {{ branch }}{% if branch == currentBranch %} (aktuell){% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label style="display: inline; font-weight: normal;">
+                                <input type="checkbox" name="force_push" value="1" checked style="margin-right: 5px;">
+                                Force Push (Server-Stand ueberschreiben)
+                            </label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Commit & Push</button>
+                    </form>
+
+                    {# Zusaetzliche Aktionen #}
+                    <div class="button-group">
+                        <form method="post" style="display: inline;">
+                            <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                            <input type="hidden" name="action" value="pull">
+                            <button type="submit" class="btn btn-info">Pull (vom Server holen)</button>
+                        </form>
+
+                        <form method="post" style="display: inline;">
+                            <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                            <input type="hidden" name="action" value="status">
+                            <button type="submit" class="btn btn-secondary">Status</button>
+                        </form>
+
+                        <form method="post" style="display: inline;">
+                            <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                            <input type="hidden" name="action" value="checkout_latest">
+                            <button type="submit" class="btn btn-secondary">Neuester Stand</button>
+                        </form>
+                    </div>
+                </div>
+
+                {# Rechte Seite: Commit Historie #}
+                <div class="right-panel">
+                    {% if commitHistory is defined and commitHistory|length > 0 %}
+                    <div class="history-section">
+                        <h3>Commit Historie</h3>
+
+                        <div class="commit-list">
+                            {% for commit in commitHistory %}
+                            <div class="commit-item {% if loop.first %}commit-current{% endif %}">
+                                <div class="commit-header">
+                                    <code class="commit-hash">{{ commit.shortHash }}</code>
+                                    {% if loop.first %}
+                                        <span class="commit-badge">HEAD</span>
+                                    {% endif %}
+                                    <span class="commit-date">{{ commit.date|date('d.m.Y H:i') }}</span>
+                                </div>
+                                <div class="commit-message" title="{{ commit.message }}">{{ commit.message }}</div>
+                                <div class="commit-author">{{ commit.author }}</div>
+                                {% if not loop.first %}
+                                <form method="post" class="commit-action">
+                                    <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                                    <input type="hidden" name="action" value="checkout_commit">
+                                    <input type="hidden" name="commit_hash" value="{{ commit.hash }}">
+                                    <button type="submit" class="btn btn-small btn-warning"
+                                            onclick="return confirm('Zu Version {{ commit.shortHash }} wechseln?');">
+                                        Wiederherstellen
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+
+        {# Footer Credit #}
+        <div class="footer-credit">
+            Git Push Bundle v1.0.0 | By <a href="https://venne-media.de" target="_blank">venne-media.de</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
