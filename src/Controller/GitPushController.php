@@ -4,22 +4,17 @@ declare(strict_types=1);
 
 namespace VennMedia\VmGitPushBundle\Controller;
 
-use VennMedia\VmGitPushBundle\Service\GitService;
 use Contao\CoreBundle\Controller\AbstractBackendController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use VennMedia\VmGitPushBundle\Service\GitService;
 
-/**
- * Git Push Controller fuer Contao 5.3 Backend
- * By venne-media.de
- */
 #[Route('/contao/git-push', name: 'vm_git_push_', defaults: ['_scope' => 'backend'])]
 class GitPushController extends AbstractBackendController
 {
-    public function __construct(
-        private readonly GitService $gitService
-    ) {
+    public function __construct(private readonly GitService $gitService)
+    {
     }
 
     #[Route('', name: 'index', methods: ['GET', 'POST'])]
@@ -266,7 +261,7 @@ class GitPushController extends AbstractBackendController
 
         $output = $result['output'] ?? '';
         if ($result['success'] && isset($result['publicKey'])) {
-            $output = "SSH Key erfolgreich generiert!\n\nPublic Key (kopieren und in GitHub/GitLab als Deploy Key hinzufuegen):\n\n" . $result['publicKey'];
+            $output = "SSH Key erfolgreich generiert!\n\nPublic Key (kopieren und in GitHub/GitLab als Deploy Key hinzufügen):\n\n" . $result['publicKey'];
         }
 
         return [
@@ -304,7 +299,7 @@ class GitPushController extends AbstractBackendController
 
         if (empty($commitHash)) {
             return [
-                'message' => 'Kein Commit ausgewaehlt.',
+                'message' => 'Kein Commit ausgewählt.',
                 'type' => 'error',
             ];
         }
@@ -365,7 +360,7 @@ class GitPushController extends AbstractBackendController
 
         if (empty($branch)) {
             return [
-                'message' => 'Kein Branch ausgewaehlt.',
+                'message' => 'Kein Branch ausgewählt.',
                 'type' => 'error',
             ];
         }
@@ -426,7 +421,7 @@ class GitPushController extends AbstractBackendController
 
         if (empty($branchName)) {
             return [
-                'message' => 'Kein Branch ausgewaehlt.',
+                'message' => 'Kein Branch ausgewählt.',
                 'type' => 'error',
             ];
         }

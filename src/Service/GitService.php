@@ -6,10 +6,6 @@ namespace VennMedia\VmGitPushBundle\Service;
 
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
-/**
- * Git Service fuer Contao 5.3
- * By venne-media.de
- */
 class GitService
 {
     private string $projectRoot;
@@ -23,8 +19,6 @@ class GitService
         $this->projectRoot = $projectDir;
         $this->sshKeyDir = $projectDir . '/var/ssh';
     }
-
-    // ========== SSH Key Management ==========
 
     public function getSshKeyPath(): string
     {
@@ -43,7 +37,6 @@ class GitService
 
     public function generateSshKey(string $comment = 'contao-git-push'): array
     {
-        // Verzeichnis erstellen falls nicht vorhanden
         if (!is_dir($this->sshKeyDir)) {
             if (!mkdir($this->sshKeyDir, 0700, true)) {
                 return [
@@ -55,7 +48,6 @@ class GitService
 
         $keyPath = $this->getSshKeyPath();
 
-        // Alte Keys loeschen falls vorhanden
         if (file_exists($keyPath)) {
             unlink($keyPath);
         }
@@ -63,7 +55,6 @@ class GitService
             unlink($keyPath . '.pub');
         }
 
-        // SSH Key generieren
         $command = sprintf(
             'ssh-keygen -t ed25519 -C %s -f %s -N "" 2>&1',
             escapeshellarg($comment),
@@ -82,7 +73,6 @@ class GitService
             ];
         }
 
-        // Berechtigungen setzen
         chmod($keyPath, 0600);
         chmod($keyPath . '.pub', 0644);
 
@@ -110,28 +100,24 @@ class GitService
             return null;
         }
 
-        // GitHub SSH: git@github.com:user/repo.git
         if (preg_match('/git@github\.com:([^\/]+)\/(.+)$/', $remoteUrl, $matches)) {
             $owner = $matches[1];
             $repo = preg_replace('/\.git$/', '', $matches[2]);
             return "https://github.com/{$owner}/{$repo}/settings/keys/new";
         }
 
-        // GitHub HTTPS: https://github.com/user/repo.git
         if (preg_match('/https:\/\/github\.com\/([^\/]+)\/(.+)$/', $remoteUrl, $matches)) {
             $owner = $matches[1];
             $repo = preg_replace('/\.git$/', '', $matches[2]);
             return "https://github.com/{$owner}/{$repo}/settings/keys/new";
         }
 
-        // GitLab SSH: git@gitlab.com:user/repo.git
         if (preg_match('/git@gitlab\.com:([^\/]+)\/(.+)$/', $remoteUrl, $matches)) {
             $owner = $matches[1];
             $repo = preg_replace('/\.git$/', '', $matches[2]);
             return "https://gitlab.com/{$owner}/{$repo}/-/settings/repository#js-deploy-keys-settings";
         }
 
-        // GitLab HTTPS
         if (preg_match('/https:\/\/gitlab\.com\/([^\/]+)\/(.+)$/', $remoteUrl, $matches)) {
             $owner = $matches[1];
             $repo = preg_replace('/\.git$/', '', $matches[2]);
@@ -157,7 +143,7 @@ class GitService
 
         return [
             'success' => true,
-            'message' => $deleted ? 'SSH Key geloescht' : 'Kein SSH Key vorhanden',
+            'message' => $deleted ? 'SSH Key gelöscht' : 'Kein SSH Key vorhanden',
         ];
     }
 
@@ -178,13 +164,12 @@ class GitService
             ];
         }
 
-        // Host aus URL extrahieren
         if (preg_match('/git@([^:]+):/', $remoteUrl, $matches)) {
             $host = $matches[1];
         } elseif (preg_match('/https?:\/\/([^\/]+)/', $remoteUrl, $matches)) {
             return [
                 'success' => false,
-                'message' => 'HTTPS URL erkannt. SSH Key wird nur fuer SSH URLs benoetigt.',
+                'message' => 'HTTPS URL erkannt. SSH Key wird nur für SSH URLs benötigt.',
             ];
         } else {
             return [
@@ -205,7 +190,6 @@ class GitService
 
         $outputStr = implode("\n", $output);
 
-        // GitHub/GitLab geben Return Code 1 zurueck, aber "successfully authenticated" im Output
         $isAuthenticated = strpos($outputStr, 'successfully authenticated') !== false
             || strpos($outputStr, 'Welcome to GitLab') !== false
             || strpos($outputStr, 'You\'ve successfully authenticated') !== false;
@@ -299,11 +283,8 @@ class GitService
 
     public function initRepository(string $remoteUrl, string $branch = 'main', ?string $sshKeyPath = null, ?string $userName = null, ?string $userEmail = null): array
     {
-        $commands = [
-            'git init',
-        ];
+        $commands = ['git init'];
 
-        // User Config setzen wenn angegeben
         if ($userName && $userEmail) {
             $commands[] = 'git config user.name ' . escapeshellarg($userName);
             $commands[] = 'git config user.email ' . escapeshellarg($userEmail);
@@ -319,7 +300,7 @@ class GitService
             if (!$result['success']) {
                 return [
                     'success' => false,
-                    'message' => 'Fehler beim Ausfuehren: ' . $command,
+                    'message' => 'Fehler beim Ausführen: ' . $command,
                     'output' => $result['output'],
                     'error' => $result['error'],
                 ];
@@ -333,21 +314,15 @@ class GitService
         ];
     }
 
-    /**
-     * Klont ein bestehendes Repository (Pull statt Push)
-     */
     public function cloneRepository(string $remoteUrl, string $branch = 'main', ?string $userName = null, ?string $userEmail = null): array
     {
-        // Zuerst: Temporaer in Unterordner klonen, dann Inhalte verschieben
         $tempDir = $this->projectRoot . '/temp_git_clone_' . uniqid();
 
-        // Clone in temporaeres Verzeichnis
         $cloneResult = $this->executeGitCommand(
             'git clone --branch ' . escapeshellarg($branch) . ' ' . escapeshellarg($remoteUrl) . ' ' . escapeshellarg($tempDir)
         );
 
         if (!$cloneResult['success']) {
-            // Versuche ohne branch (wenn branch nicht existiert)
             $cloneResult = $this->executeGitCommand(
                 'git clone ' . escapeshellarg($remoteUrl) . ' ' . escapeshellarg($tempDir)
             );
@@ -362,16 +337,13 @@ class GitService
             ];
         }
 
-        // .git Ordner verschieben
         $gitDir = $tempDir . '/.git';
         $targetGitDir = $this->projectRoot . '/.git';
 
         if (is_dir($targetGitDir)) {
-            // Altes .git loeschen
             $this->deleteDirectory($targetGitDir);
         }
 
-        // Verschieben
         if (!rename($gitDir, $targetGitDir)) {
             $this->deleteDirectory($tempDir);
             return [
@@ -380,16 +352,13 @@ class GitService
             ];
         }
 
-        // Temp Ordner loeschen
         $this->deleteDirectory($tempDir);
 
-        // User Config setzen
         if ($userName && $userEmail) {
             $this->executeGitCommand('git config user.name ' . escapeshellarg($userName));
             $this->executeGitCommand('git config user.email ' . escapeshellarg($userEmail));
         }
 
-        // Reset zum Remote-Stand (holt die Dateien)
         $resetResult = $this->executeGitCommand('git reset --hard origin/' . escapeshellarg($branch));
 
         return [
@@ -418,13 +387,9 @@ class GitService
         return rmdir($dir);
     }
 
-    /**
-     * Holt alle Remote-Branches
-     */
     public function getRemoteBranches(): array
     {
         $this->fetch();
-
         $result = $this->executeGitCommand('git branch -r');
 
         if (!$result['success']) {
@@ -436,31 +401,22 @@ class GitService
 
         foreach ($lines as $line) {
             $branch = trim($line);
-            // Entferne "origin/" Prefix und ignoriere HEAD
             if (strpos($branch, 'origin/') === 0 && strpos($branch, 'HEAD') === false) {
-                $branches[] = substr($branch, 7); // Entferne "origin/"
+                $branches[] = substr($branch, 7);
             }
         }
 
         return array_unique($branches);
     }
 
-    /**
-     * Wechselt zu einem anderen Branch
-     */
     public function switchBranch(string $branch): array
     {
-        // Zuerst fetch um sicher zu sein dass wir alle Branches haben
         $this->fetch();
-
-        // Pruefen ob lokaler Branch existiert
         $localBranches = $this->getBranches();
 
         if (in_array($branch, $localBranches)) {
-            // Lokaler Branch existiert - einfach wechseln
             $result = $this->executeGitCommand('git checkout ' . escapeshellarg($branch));
         } else {
-            // Lokaler Branch existiert nicht - vom Remote erstellen
             $result = $this->executeGitCommand(
                 'git checkout -b ' . escapeshellarg($branch) . ' origin/' . escapeshellarg($branch)
             );
@@ -482,20 +438,15 @@ class GitService
         ];
     }
 
-    /**
-     * Erstellt einen neuen Branch
-     */
     public function createBranch(string $branchName, bool $pushToRemote = true): array
     {
-        // Validierung: Branch-Name pruefen
         if (!preg_match('/^[a-zA-Z0-9\-_\/]+$/', $branchName)) {
             return [
                 'success' => false,
-                'message' => 'Ungueltiger Branch-Name. Erlaubt: Buchstaben, Zahlen, -, _, /',
+                'message' => 'Ungültiger Branch-Name. Erlaubt: Buchstaben, Zahlen, -, _, /',
             ];
         }
 
-        // Branch erstellen und wechseln
         $result = $this->executeGitCommand('git checkout -b ' . escapeshellarg($branchName));
 
         if (!$result['success']) {
@@ -507,11 +458,8 @@ class GitService
             ];
         }
 
-        // Optional: Zum Remote pushen
         if ($pushToRemote) {
-            $pushResult = $this->executeGitCommand(
-                'git push -u origin ' . escapeshellarg($branchName)
-            );
+            $pushResult = $this->executeGitCommand('git push -u origin ' . escapeshellarg($branchName));
 
             if (!$pushResult['success']) {
                 return [
@@ -530,17 +478,11 @@ class GitService
         ];
     }
 
-    /**
-     * Prueft ob es Remote-Aenderungen gibt (hinter Remote)
-     */
     public function hasRemoteChanges(): bool
     {
         $this->fetch();
-
         $branch = $this->getCurrentBranch();
-        $result = $this->executeGitCommand(
-            'git rev-list HEAD..origin/' . escapeshellarg($branch) . ' --count'
-        );
+        $result = $this->executeGitCommand('git rev-list HEAD..origin/' . escapeshellarg($branch) . ' --count');
 
         if (!$result['success']) {
             return false;
@@ -549,25 +491,15 @@ class GitService
         return (int)trim($result['output']) > 0;
     }
 
-    /**
-     * Holt die Anzahl der Commits hinter/vor dem Remote
-     */
     public function getRemoteStatus(): array
     {
         $this->fetch();
-
         $branch = $this->getCurrentBranch();
 
-        // Commits hinter Remote (neue auf Remote)
-        $behindResult = $this->executeGitCommand(
-            'git rev-list HEAD..origin/' . escapeshellarg($branch) . ' --count'
-        );
+        $behindResult = $this->executeGitCommand('git rev-list HEAD..origin/' . escapeshellarg($branch) . ' --count');
         $behind = $behindResult['success'] ? (int)trim($behindResult['output']) : 0;
 
-        // Commits vor Remote (neue lokal)
-        $aheadResult = $this->executeGitCommand(
-            'git rev-list origin/' . escapeshellarg($branch) . '..HEAD --count'
-        );
+        $aheadResult = $this->executeGitCommand('git rev-list origin/' . escapeshellarg($branch) . '..HEAD --count');
         $ahead = $aheadResult['success'] ? (int)trim($aheadResult['output']) : 0;
 
         return [
@@ -587,44 +519,34 @@ class GitService
 
         return [
             'success' => $result['success'],
-            'message' => $result['success'] ? 'Remote erfolgreich hinzugefuegt' : 'Fehler beim Hinzufuegen des Remote',
+            'message' => $result['success'] ? 'Remote erfolgreich hinzugefügt' : 'Fehler beim Hinzufügen des Remote',
             'output' => $result['output'],
             'error' => $result['error'] ?? '',
         ];
     }
 
-    /**
-     * Aendert die Remote-URL
-     */
     public function setRemoteUrl(string $remoteUrl): array
     {
         $result = $this->executeGitCommand('git remote set-url origin ' . escapeshellarg($remoteUrl));
 
         return [
             'success' => $result['success'],
-            'message' => $result['success'] ? 'Remote URL erfolgreich geaendert' : 'Fehler beim Aendern der Remote URL',
+            'message' => $result['success'] ? 'Remote URL erfolgreich geändert' : 'Fehler beim Ändern der Remote URL',
             'output' => $result['output'],
             'error' => $result['error'] ?? '',
         ];
     }
 
-    /**
-     * Benennt einen Branch um
-     */
     public function renameBranch(string $oldName, string $newName): array
     {
-        // Validierung
         if (!preg_match('/^[a-zA-Z0-9\-_\/]+$/', $newName)) {
             return [
                 'success' => false,
-                'message' => 'Ungueltiger Branch-Name. Erlaubt: Buchstaben, Zahlen, -, _, /',
+                'message' => 'Ungültiger Branch-Name. Erlaubt: Buchstaben, Zahlen, -, _, /',
             ];
         }
 
-        // Lokalen Branch umbenennen
-        $result = $this->executeGitCommand(
-            'git branch -m ' . escapeshellarg($oldName) . ' ' . escapeshellarg($newName)
-        );
+        $result = $this->executeGitCommand('git branch -m ' . escapeshellarg($oldName) . ' ' . escapeshellarg($newName));
 
         if (!$result['success']) {
             return [
@@ -635,7 +557,6 @@ class GitService
             ];
         }
 
-        // Remote: Alten Branch loeschen und neuen pushen
         $this->executeGitCommand('git push origin --delete ' . escapeshellarg($oldName));
         $pushResult = $this->executeGitCommand('git push -u origin ' . escapeshellarg($newName));
 
@@ -646,9 +567,6 @@ class GitService
         ];
     }
 
-    /**
-     * Loescht einen Branch (lokal und remote)
-     */
     public function deleteBranch(string $branchName, bool $deleteRemote = true): array
     {
         $currentBranch = $this->getCurrentBranch();
@@ -656,32 +574,28 @@ class GitService
         if ($branchName === $currentBranch) {
             return [
                 'success' => false,
-                'message' => 'Kann den aktiven Branch nicht loeschen. Bitte zuerst zu einem anderen Branch wechseln.',
+                'message' => 'Kann den aktiven Branch nicht löschen. Bitte zuerst zu einem anderen Branch wechseln.',
             ];
         }
 
-        // Lokalen Branch loeschen
         $result = $this->executeGitCommand('git branch -D ' . escapeshellarg($branchName));
 
         if (!$result['success']) {
             return [
                 'success' => false,
-                'message' => 'Fehler beim Loeschen des lokalen Branches',
+                'message' => 'Fehler beim Löschen des lokalen Branches',
                 'output' => $result['output'],
                 'error' => $result['error'],
             ];
         }
 
-        // Remote Branch loeschen wenn gewuenscht
         if ($deleteRemote) {
-            $remoteResult = $this->executeGitCommand(
-                'git push origin --delete ' . escapeshellarg($branchName)
-            );
+            $remoteResult = $this->executeGitCommand('git push origin --delete ' . escapeshellarg($branchName));
 
             if (!$remoteResult['success']) {
                 return [
                     'success' => true,
-                    'message' => 'Branch lokal geloescht, aber Remote-Loeschung fehlgeschlagen',
+                    'message' => 'Branch lokal gelöscht, aber Remote-Löschung fehlgeschlagen',
                     'output' => $result['output'] . "\n" . $remoteResult['output'],
                 ];
             }
@@ -689,7 +603,7 @@ class GitService
 
         return [
             'success' => true,
-            'message' => 'Branch "' . $branchName . '" erfolgreich geloescht',
+            'message' => 'Branch "' . $branchName . '" erfolgreich gelöscht',
             'output' => $result['output'],
         ];
     }
@@ -706,7 +620,7 @@ class GitService
         if (strpos($result['output'], 'CONFLICT') !== false || strpos($result['error'], 'CONFLICT') !== false) {
             return [
                 'success' => false,
-                'message' => 'Konflikte beim Pull erkannt! Bitte manuell aufloesen.',
+                'message' => 'Konflikte beim Pull erkannt! Bitte manuell auflösen.',
                 'output' => $result['output'],
                 'error' => $result['error'],
                 'hasConflicts' => true,
@@ -795,7 +709,6 @@ class GitService
 
     public function commitAndPush(string $message, string $branch, ?string $sshKeyPath = null, bool $forcePush = false): array
     {
-        // Zuerst ignorierte Dateien aus dem Index entfernen (falls vorher getrackt)
         $this->cleanIgnoredFromIndex();
 
         $addResult = $this->executeGitCommand('git add .');
@@ -818,7 +731,6 @@ class GitService
             ];
         }
 
-        // Force Push wenn aktiviert - Server-Stand hat immer Vorrang
         $forceFlag = $forcePush ? ' --force' : '';
         $pushResult = $this->executeGitCommand(
             'git push' . $forceFlag . ' origin ' . escapeshellarg($branch),
@@ -826,7 +738,6 @@ class GitService
         );
 
         if (!$pushResult['success'] && !$forcePush) {
-            // Versuche mit --set-upstream
             $pushResult = $this->executeGitCommand(
                 'git push --set-upstream origin ' . escapeshellarg($branch),
                 $sshKeyPath
@@ -834,7 +745,6 @@ class GitService
         }
 
         if (!$pushResult['success'] && !$forcePush) {
-            // Letzter Versuch: Force Push
             $pushResult = $this->executeGitCommand(
                 'git push --force origin ' . escapeshellarg($branch),
                 $sshKeyPath
@@ -871,14 +781,9 @@ class GitService
         ];
     }
 
-    /**
-     * Holt die Commit-Historie (letzte X Commits)
-     */
     public function getCommitHistory(int $limit = 20): array
     {
-        $result = $this->executeGitCommand(
-            'git log --format="%H|%s|%an|%ci" -n ' . (int)$limit
-        );
+        $result = $this->executeGitCommand('git log --format="%H|%s|%an|%ci" -n ' . (int)$limit);
 
         if (!$result['success'] || empty(trim($result['output']))) {
             return [];
@@ -905,23 +810,16 @@ class GitService
         return $commits;
     }
 
-    /**
-     * Wechselt zu einem bestimmten Commit (HARD Reset - Achtung!)
-     */
     public function checkoutCommit(string $commitHash): array
     {
-        // Validierung: Nur gueltige Hashes erlauben
         if (!preg_match('/^[a-f0-9]{7,40}$/i', $commitHash)) {
             return [
                 'success' => false,
-                'message' => 'Ungueltiger Commit Hash',
+                'message' => 'Ungültiger Commit Hash',
             ];
         }
 
-        // Zuerst: Alle lokalen Aenderungen sichern falls vorhanden
-        $stashResult = $this->executeGitCommand('git stash');
-
-        // Hard Reset zum gewaehlten Commit
+        $this->executeGitCommand('git stash');
         $result = $this->executeGitCommand('git reset --hard ' . escapeshellarg($commitHash));
 
         if (!$result['success']) {
@@ -940,25 +838,20 @@ class GitService
         ];
     }
 
-    /**
-     * Stellt den neuesten Stand wieder her (HEAD des Branches)
-     */
     public function checkoutLatest(): array
     {
         $branch = $this->getCurrentBranch();
-
         $result = $this->executeGitCommand('git checkout ' . escapeshellarg($branch));
 
         if (!$result['success']) {
-            // Versuche mit reset
             $result = $this->executeGitCommand('git reset --hard origin/' . escapeshellarg($branch));
         }
 
         return [
             'success' => $result['success'],
             'message' => $result['success']
-                ? 'Zurueck zum aktuellen Stand (' . $branch . ')'
-                : 'Fehler beim Zuruecksetzen',
+                ? 'Zurück zum aktuellen Stand (' . $branch . ')'
+                : 'Fehler beim Zurücksetzen',
             'output' => $result['output'],
             'error' => $result['error'] ?? '',
         ];
@@ -980,14 +873,9 @@ class GitService
         $this->safeDirectoryAdded = true;
     }
 
-    /**
-     * Entfernt ignorierte Dateien aus dem Git-Index (ohne sie zu loeschen).
-     * Wichtig wenn .gitignore nachtraeglich hinzugefuegt wurde.
-     */
     private function cleanIgnoredFromIndex(): void
     {
-        // Dateien/Ordner die NIEMALS ins Git sollen (Contao Best Practice)
-        $alwaysIgnore = [
+        $paths = [
             'vendor/',
             'var/',
             '.env.local',
@@ -1003,8 +891,7 @@ class GitService
             'system/config/localconfig.php',
         ];
 
-        foreach ($alwaysIgnore as $path) {
-            // git rm -r --cached entfernt aus Index, laesst Dateien auf Disk
+        foreach ($paths as $path) {
             $this->executeGitCommand('git rm -r --cached --ignore-unmatch ' . escapeshellarg($path));
         }
     }
@@ -1014,10 +901,9 @@ class GitService
         $this->ensureSafeDirectory();
 
         $env = '';
-
-        // SSH-Kommandos (push, pull, fetch, clone) brauchen StrictHostKeyChecking=no
         $sshCommands = ['push', 'pull', 'fetch', 'clone', 'ls-remote'];
         $needsSshConfig = false;
+
         foreach ($sshCommands as $sshCmd) {
             if (strpos($command, 'git ' . $sshCmd) !== false) {
                 $needsSshConfig = true;
@@ -1026,7 +912,6 @@ class GitService
         }
 
         if ($needsSshConfig) {
-            // Wenn kein Key-Pfad angegeben, automatisch den generierten Key verwenden
             if (!$sshKeyPath && $this->hasSshKey()) {
                 $sshKeyPath = $this->getSshKeyPath();
             }
@@ -1043,7 +928,6 @@ class GitService
 
         $output = [];
         $returnCode = 0;
-
         exec($fullCommand, $output, $returnCode);
 
         $outputStr = implode("\n", $output);

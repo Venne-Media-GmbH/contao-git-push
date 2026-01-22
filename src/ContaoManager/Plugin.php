@@ -15,15 +15,8 @@ use Symfony\Component\Routing\Loader\YamlFileLoader;
 use Symfony\Component\Routing\RouteCollection;
 use VennMedia\VmGitPushBundle\VmGitPushBundle;
 
-/**
- * Contao Manager Plugin
- * By venne-media.de
- */
 final class Plugin implements BundlePluginInterface, RoutingPluginInterface
 {
-    /**
-     * @return array<int, BundleConfig>
-     */
     public function getBundles(ParserInterface $parser): array
     {
         return [
@@ -34,8 +27,6 @@ final class Plugin implements BundlePluginInterface, RoutingPluginInterface
 
     public function getRouteCollection(LoaderResolverInterface $resolver, KernelInterface $kernel): ?RouteCollection
     {
-        $locator = new FileLocator(\dirname(__DIR__, 2) . '/config');
-        $loader = new YamlFileLoader($locator);
-        return $loader->load('routes.yaml');
+        return (new YamlFileLoader(new FileLocator(\dirname(__DIR__, 2) . '/config')))->load('routes.yaml');
     }
 }
