@@ -1,7 +1,6 @@
 {
     "name": "venne-media/contao-git-push",
     "description": "Backend module for Git operations in Contao 5.3",
-    "version": "1.0.0",
     "type": "contao-bundle",
     "license": "MIT",
     "authors": [
