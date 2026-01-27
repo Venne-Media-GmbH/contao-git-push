@@ -283,6 +283,7 @@ class GitService
 
     public function initRepository(string $remoteUrl, string $branch = 'main', ?string $sshKeyPath = null, ?string $userName = null, ?string $userEmail = null): array
     {
+        $this->createDefaultGitignore();
         $commands = ['git init'];
 
         if ($userName && $userEmail) {
@@ -366,6 +367,49 @@ class GitService
             'message' => 'Repository erfolgreich geklont. Die Server-Version ist jetzt aktiv.',
             'output' => $cloneResult['output'] . "\n" . ($resetResult['output'] ?? ''),
         ];
+    }
+
+    private function createDefaultGitignore(): void
+    {
+        $gitignorePath = $this->projectRoot . '/.gitignore';
+        if (file_exists($gitignorePath)) {
+            return;
+        }
+
+        $content = <<<'GITIGNORE'
+# Contao
+/var/
+/vendor/
+/assets/
+/system/tmp/
+/system/config/localconfig.php
+/files/
+/web/bundles/
+/web/assets/
+/web/share/
+/web/system/
+/public/bundles/
+/public/assets/
+/public/share/
+/public/system/
+/contao-manager/
+
+# Environment
+.env.local
+.env.*.local
+
+# Node
+/node_modules/
+
+# System
+.DS_Store
+Thumbs.db
+*.log
+*.swp
+*.swo
+GITIGNORE;
+
+        file_put_contents($gitignorePath, $content);
     }
 
     private function deleteDirectory(string $dir): bool
