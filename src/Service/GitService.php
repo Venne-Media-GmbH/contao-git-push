@@ -783,7 +783,9 @@ class GitService
 
     public function getCommitHistory(int $limit = 20): array
     {
-        $result = $this->executeGitCommand('git log --format="%H|%s|%an|%ci" -n ' . (int)$limit);
+        $this->fetch();
+        $branch = $this->getCurrentBranch();
+        $result = $this->executeGitCommand('git log origin/' . escapeshellarg($branch) . ' --format="%H|%s|%an|%ci" -n ' . (int)$limit);
 
         if (!$result['success'] || empty(trim($result['output']))) {
             return [];
