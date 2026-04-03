@@ -11,6 +11,8 @@ services:
 
     VennMedia\VmGitPushBundle\Service\GitHostingApiService: ~
 
+    VennMedia\VmGitPushBundle\Service\GitignoreService: ~
+
     VennMedia\VmGitPushBundle\Validator\GitInputValidator: ~
 
     VennMedia\VmGitPushBundle\Service\GitService: ~

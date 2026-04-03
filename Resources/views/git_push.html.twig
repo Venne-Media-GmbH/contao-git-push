@@ -4,6 +4,37 @@
     Git - by venne-media.de
 {% endblock %}
 
+{% macro gitignore_config(configurablePaths, idPrefix) %}
+    {% if configurablePaths is defined and configurablePaths|length > 0 %}
+    <div class="gitignore-config">
+        <h4>.gitignore Konfiguration</h4>
+        <p style="color: #888; font-size: 11px; margin: 0 0 8px 0;">
+            Wählen Sie aus, welche Verzeichnisse <strong>nicht</strong> ins Repository aufgenommen werden sollen.
+            Angehakte Einträge werden ignoriert.
+        </p>
+        <div class="gitignore-list">
+            {% for path, info in configurablePaths %}
+            <div class="gitignore-item">
+                <label>
+                    <input type="checkbox" name="ignore_paths[]" value="{{ path }}"
+                           {% if info.ignore_default %}checked{% endif %}>
+                    <span>
+                        <span class="path-name">{{ info.label }}</span>
+                        <span class="path-desc">{{ info.description }}</span>
+                    </span>
+                </label>
+                {% if info.exists %}
+                    <span class="path-exists">vorhanden</span>
+                {% else %}
+                    <span class="path-missing">nicht vorhanden</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+{% endmacro %}
+
 {% block main %}
 <div class="tl_listing_container" style="width: 100%; max-width: none;">
     <style>
@@ -532,6 +563,70 @@
         .vm-git-push .footer-credit a:hover {
             text-decoration: underline;
         }
+
+        /* Gitignore Config */
+        .vm-git-push .gitignore-config {
+            background: #1a1a2e;
+            border: 1px solid #3a3a5e;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .vm-git-push .gitignore-config h4 {
+            margin: 0 0 8px 0;
+            font-size: 13px;
+            color: #aaccff;
+        }
+        .vm-git-push .gitignore-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .vm-git-push .gitignore-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 5px 8px;
+            border-radius: 3px;
+            margin-bottom: 2px;
+        }
+        .vm-git-push .gitignore-item:hover {
+            background: #252540;
+        }
+        .vm-git-push .gitignore-item label {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            cursor: pointer;
+            font-weight: normal;
+            flex: 1;
+            margin: 0;
+        }
+        .vm-git-push .gitignore-item input[type="checkbox"] {
+            margin-top: 3px;
+            flex-shrink: 0;
+        }
+        .vm-git-push .gitignore-item .path-name {
+            color: #ddd;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .vm-git-push .gitignore-item .path-desc {
+            color: #888;
+            font-size: 10px;
+            display: block;
+        }
+        .vm-git-push .gitignore-item .path-exists {
+            color: #5cb85c;
+            font-size: 9px;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        .vm-git-push .gitignore-item .path-missing {
+            color: #666;
+            font-size: 9px;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
     </style>
 
     <div class="vm-git-push">
@@ -700,6 +795,8 @@
                         <input type="text" id="auto_branch" name="branch" value="main" placeholder="main">
                     </div>
 
+                    {{ _self.gitignore_config(configurablePaths, 'auto') }}
+
                     <button type="submit" class="btn btn-primary">Repository erstellen & einrichten</button>
                 </form>
             </div>
@@ -739,6 +836,8 @@
                         <label for="clone_branch">Branch Name</label>
                         <input type="text" id="clone_branch" name="branch" value="main" placeholder="main">
                     </div>
+
+                    {{ _self.gitignore_config(configurablePaths, 'clone') }}
 
                     <button type="submit" class="btn btn-primary">Repository klonen</button>
                 </form>
@@ -783,6 +882,8 @@
                         <label for="init_branch">Branch Name</label>
                         <input type="text" id="init_branch" name="branch" value="main" placeholder="main">
                     </div>
+
+                    {{ _self.gitignore_config(configurablePaths, 'init') }}
 
                     <button type="submit" class="btn btn-primary">Repository einrichten</button>
                 </form>

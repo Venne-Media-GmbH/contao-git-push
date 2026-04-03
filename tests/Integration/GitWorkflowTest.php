@@ -39,7 +39,8 @@ class GitWorkflowTest extends TestCase
         $validator = new GitInputValidator();
         $sshService = new SshKeyService($this->executor);
         $hostingApi = new \VennMedia\VmGitPushBundle\Service\GitHostingApiService();
-        $this->service = new GitService($this->executor, $validator, $sshService, $hostingApi);
+        $gitignoreService = new \VennMedia\VmGitPushBundle\Service\GitignoreService($this->clientDir);
+        $this->service = new GitService($this->executor, $validator, $sshService, $hostingApi, $gitignoreService);
     }
 
     protected function tearDown(): void

@@ -130,6 +130,7 @@ class GitPushController extends AbstractBackendController
             'hasSshKey' => $sshService->hasSshKey(),
             'sshPublicKey' => $sshService->getPublicKey(),
             'deployKeyUrl' => $remoteUrl ? $sshService->getDeployKeyUrl($remoteUrl) : null,
+            'configurablePaths' => !$isGitRepo ? $this->gitService->getGitignoreService()->getConfigurablePaths() : [],
         ];
 
         if ($isGitRepo) {
@@ -174,8 +175,9 @@ class GitPushController extends AbstractBackendController
         $branch = trim($request->request->getString('branch', 'main'));
         $userName = trim($request->request->getString('git_user_name'));
         $userEmail = trim($request->request->getString('git_user_email'));
+        $ignorePaths = $request->request->all('ignore_paths');
 
-        $result = $this->gitService->initRepository($remoteUrl, $branch, $userName ?: null, $userEmail ?: null);
+        $result = $this->gitService->initRepository($remoteUrl, $branch, $userName ?: null, $userEmail ?: null, $ignorePaths);
 
         return $this->formatResult($result);
     }
@@ -194,8 +196,10 @@ class GitPushController extends AbstractBackendController
             return ['message' => 'Bitte wählen Sie GitHub oder GitLab.', 'type' => 'error'];
         }
 
+        $ignorePaths = $request->request->all('ignore_paths');
+
         $result = $this->gitService->autoSetupRepository(
-            $provider, $token, $repoName, $private, $branch, $userName, $userEmail
+            $provider, $token, $repoName, $private, $branch, $userName, $userEmail, $ignorePaths
         );
 
         return $this->formatResult($result);
@@ -208,7 +212,9 @@ class GitPushController extends AbstractBackendController
         $userName = trim($request->request->getString('git_user_name'));
         $userEmail = trim($request->request->getString('git_user_email'));
 
-        $result = $this->gitService->cloneRepository($remoteUrl, $branch, $userName ?: null, $userEmail ?: null);
+        $ignorePaths = $request->request->all('ignore_paths');
+
+        $result = $this->gitService->cloneRepository($remoteUrl, $branch, $userName ?: null, $userEmail ?: null, $ignorePaths);
 
         return $this->formatResult($result);
     }

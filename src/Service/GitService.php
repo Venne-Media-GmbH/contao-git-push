@@ -20,6 +20,7 @@ class GitService
         private readonly GitInputValidator $validator,
         private readonly SshKeyService $sshKeyService,
         private readonly GitHostingApiService $hostingApi,
+        private readonly GitignoreService $gitignoreService,
         private readonly ?LoggerInterface $logger = null,
     ) {
     }
@@ -37,6 +38,11 @@ class GitService
     public function getHostingApi(): GitHostingApiService
     {
         return $this->hostingApi;
+    }
+
+    public function getGitignoreService(): GitignoreService
+    {
+        return $this->gitignoreService;
     }
 
     // ── Repository State ──────────────────────────────────────────
@@ -111,7 +117,10 @@ class GitService
 
     // ── Repository Init/Clone ─────────────────────────────────────
 
-    public function initRepository(string $remoteUrl, string $branch = 'main', ?string $userName = null, ?string $userEmail = null): GitResult
+    /**
+     * @param string[] $ignorePaths Pfade die in .gitignore aufgenommen werden sollen
+     */
+    public function initRepository(string $remoteUrl, string $branch = 'main', ?string $userName = null, ?string $userEmail = null, array $ignorePaths = []): GitResult
     {
         $this->validator->validateRemoteUrl($remoteUrl);
         $this->validator->validateBranchName($branch);
@@ -122,7 +131,11 @@ class GitService
         }
 
         // 1. Git init + Konfiguration
-        $this->createDefaultGitignore();
+        if (!empty($ignorePaths)) {
+            $this->gitignoreService->createGitignore($ignorePaths);
+        } elseif (!$this->gitignoreService->hasGitignore()) {
+            $this->gitignoreService->createGitignore($this->gitignoreService->getDefaultIgnorePaths());
+        }
 
         $commands = ['git init'];
 
@@ -204,6 +217,7 @@ class GitService
         string $branch,
         string $userName,
         string $userEmail,
+        array $ignorePaths = [],
     ): GitResult {
         $this->validator->validateBranchName($branch);
         $this->validator->validateUserName($userName);
@@ -273,7 +287,11 @@ class GitService
         $steps[] = 'Deploy Key eingetragen (Schreibrechte)';
 
         // 5. Git init + config + remote
-        $this->createDefaultGitignore();
+        if (!empty($ignorePaths)) {
+            $this->gitignoreService->createGitignore($ignorePaths);
+        } else {
+            $this->gitignoreService->createGitignore($this->gitignoreService->getDefaultIgnorePaths());
+        }
         $commands = [
             'git init',
             'git config user.name ' . escapeshellarg($userName),
@@ -333,7 +351,7 @@ class GitService
         );
     }
 
-    public function cloneRepository(string $remoteUrl, string $branch = 'main', ?string $userName = null, ?string $userEmail = null): GitResult
+    public function cloneRepository(string $remoteUrl, string $branch = 'main', ?string $userName = null, ?string $userEmail = null, array $ignorePaths = []): GitResult
     {
         $this->validator->validateRemoteUrl($remoteUrl);
         $this->validator->validateBranchName($branch);
@@ -383,7 +401,11 @@ class GitService
             $this->executor->execute('git config user.email ' . escapeshellarg($userEmail));
         }
 
-        $this->createDefaultGitignore();
+        if (!empty($ignorePaths)) {
+            $this->gitignoreService->createGitignore($ignorePaths);
+        } elseif (!$this->gitignoreService->hasGitignore()) {
+            $this->gitignoreService->createGitignore($this->gitignoreService->getDefaultIgnorePaths());
+        }
 
         $resetResult = $this->executor->execute('git reset --hard origin/' . escapeshellarg($branch));
 
@@ -973,48 +995,7 @@ class GitService
         }
     }
 
-    private function createDefaultGitignore(): void
-    {
-        $gitignorePath = $this->executor->getProjectRoot() . '/.gitignore';
-        if (file_exists($gitignorePath)) {
-            return;
-        }
-
-        $content = <<<'GITIGNORE'
-# Contao
-/var/
-/vendor/
-/assets/
-/system/tmp/
-/system/config/localconfig.php
-/files/
-/web/bundles/
-/web/assets/
-/web/share/
-/web/system/
-/public/bundles/
-/public/assets/
-/public/share/
-/public/system/
-/contao-manager/
-
-# Environment
-.env.local
-.env.*.local
-
-# Node
-/node_modules/
-
-# System
-.DS_Store
-Thumbs.db
-*.log
-*.swp
-*.swo
-GITIGNORE;
-
-        file_put_contents($gitignorePath, $content);
-    }
+    // createDefaultGitignore entfernt - wird jetzt von GitignoreService übernommen
 
     private function deleteDirectory(string $dir): bool
     {
