@@ -1,14 +1,21 @@
 # venne-media/contao-git-push
 
-Backend-Modul zur Verwaltung von Git-Repositories in Contao 5.3.
+> **Vibe Coded** - Dieses Package wurde mit Claude Code (AI) entwickelt.
+
+Backend-Modul zur Verwaltung von Git-Repositories in Contao 5.3. Ermoeglicht es, Code-Aenderungen von Entwicklern und Content-Aenderungen aus dem Contao-Backend zusammenzufuehren - direkt aus dem CMS heraus.
 
 ## Features
 
 - Git-Operationen direkt aus dem Contao Backend (Push, Pull, Commit)
 - SSH-Key-Verwaltung mit automatischer Generierung
-- Branch-Verwaltung (Erstellen, Wechseln, Umbenennen, Löschen)
+- Branch-Verwaltung (Erstellen, Wechseln, Umbenennen, Loeschen)
 - Commit-Historie mit Wiederherstellungsfunktion
 - Sync-Status zwischen lokalem und Remote-Repository
+- Input-Validation auf allen Eingaben (URLs, Branch-Namen, E-Mail)
+- File-basiertes Locking gegen konkurrierende Git-Operationen
+- Auto-Stash bei Pull und Branch-Wechsel
+- Schutz fuer protected Branches (main, master, prod)
+- 114 Tests, 196 Assertions
 
 ## Systemanforderungen
 
@@ -25,7 +32,7 @@ composer require venne-media/contao-git-push
 
 ## Konfiguration
 
-Nach der Installation erscheint im Backend unter "System" der Menüpunkt "Git".
+Nach der Installation erscheint im Backend unter "System" der Menuepunkt **"GIT Connect"**.
 
 Beim ersten Aufruf:
 1. Repository klonen (empfohlen) oder neu initialisieren
@@ -35,18 +42,22 @@ Beim ersten Aufruf:
 ## Verwendung
 
 Das Modul bietet folgende Funktionen:
-- **Commit & Push**: Lokale Änderungen committen und zum Remote pushen
-- **Pull**: Änderungen vom Remote holen
+- **Commit & Push**: Lokale Aenderungen committen und zum Remote pushen
+- **Pull**: Aenderungen vom Remote holen (mit Auto-Stash bei lokalen Aenderungen)
 - **Branch-Verwaltung**: Zwischen Branches wechseln oder neue erstellen
-- **Commit-Historie**: Ältere Versionen wiederherstellen
+- **Commit-Historie**: Aeltere Versionen wiederherstellen
+
+## Upgrade von v1.x auf v2.0
+
+v2.0 ist ein komplettes Refactoring mit Breaking Changes:
+- Force Push ist standardmaessig **deaktiviert**
+- Force Push auf protected Branches (main/master/prod) ist blockiert
+- Konflikte beim Pull werden automatisch abgebrochen statt den Code zu beschaedigen
+- Alle Eingaben werden validiert
 
 ## Hinweise zum Contao Manager
 
 Das Bundle registriert sich automatisch. Nach der Installation Cache leeren.
-
-## Upgrade-Hinweise
-
-Keine besonderen Hinweise für v1.0.0.
 
 ## Lizenz
 
