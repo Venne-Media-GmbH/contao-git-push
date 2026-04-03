@@ -2,6 +2,14 @@ services:
     _defaults:
         autowire: true
         autoconfigure: true
+        bind:
+            Psr\Log\LoggerInterface: '@?logger'
+
+    VennMedia\VmGitPushBundle\Service\GitCommandExecutor: ~
+
+    VennMedia\VmGitPushBundle\Service\SshKeyService: ~
+
+    VennMedia\VmGitPushBundle\Validator\GitInputValidator: ~
 
     VennMedia\VmGitPushBundle\Service\GitService: ~
 

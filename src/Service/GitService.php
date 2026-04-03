@@ -4,213 +4,40 @@ declare(strict_types=1);
 
 namespace VennMedia\VmGitPushBundle\Service;
 
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Psr\Log\LoggerInterface;
+use VennMedia\VmGitPushBundle\Dto\CommitInfo;
+use VennMedia\VmGitPushBundle\Dto\GitResult;
+use VennMedia\VmGitPushBundle\Dto\GitStatus;
+use VennMedia\VmGitPushBundle\Dto\RemoteStatus;
+use VennMedia\VmGitPushBundle\Exception\GitConflictException;
+use VennMedia\VmGitPushBundle\Exception\GitException;
+use VennMedia\VmGitPushBundle\Validator\GitInputValidator;
 
 class GitService
 {
-    private string $projectRoot;
-    private string $sshKeyDir;
-    private bool $safeDirectoryAdded = false;
-
     public function __construct(
-        #[Autowire('%kernel.project_dir%')]
-        string $projectDir
+        private readonly GitCommandExecutor $executor,
+        private readonly GitInputValidator $validator,
+        private readonly SshKeyService $sshKeyService,
+        private readonly ?LoggerInterface $logger = null,
     ) {
-        $this->projectRoot = $projectDir;
-        $this->sshKeyDir = $projectDir . '/var/ssh';
-    }
-
-    public function getSshKeyPath(): string
-    {
-        return $this->sshKeyDir . '/git_deploy_key';
-    }
-
-    public function getSshPublicKeyPath(): string
-    {
-        return $this->getSshKeyPath() . '.pub';
-    }
-
-    public function hasSshKey(): bool
-    {
-        return file_exists($this->getSshKeyPath()) && file_exists($this->getSshPublicKeyPath());
-    }
-
-    public function generateSshKey(string $comment = 'contao-git-push'): array
-    {
-        if (!is_dir($this->sshKeyDir)) {
-            if (!mkdir($this->sshKeyDir, 0700, true)) {
-                return [
-                    'success' => false,
-                    'message' => 'Konnte SSH Verzeichnis nicht erstellen: ' . $this->sshKeyDir,
-                ];
-            }
-        }
-
-        $keyPath = $this->getSshKeyPath();
-
-        if (file_exists($keyPath)) {
-            unlink($keyPath);
-        }
-        if (file_exists($keyPath . '.pub')) {
-            unlink($keyPath . '.pub');
-        }
-
-        $command = sprintf(
-            'ssh-keygen -t ed25519 -C %s -f %s -N "" 2>&1',
-            escapeshellarg($comment),
-            escapeshellarg($keyPath)
-        );
-
-        $output = [];
-        $returnCode = 0;
-        exec($command, $output, $returnCode);
-
-        if ($returnCode !== 0) {
-            return [
-                'success' => false,
-                'message' => 'Fehler beim Generieren des SSH Keys',
-                'output' => implode("\n", $output),
-            ];
-        }
-
-        chmod($keyPath, 0600);
-        chmod($keyPath . '.pub', 0644);
-
-        return [
-            'success' => true,
-            'message' => 'SSH Key erfolgreich generiert',
-            'publicKey' => $this->getPublicKey(),
-            'keyPath' => $keyPath,
-        ];
-    }
-
-    public function getPublicKey(): ?string
-    {
-        $pubKeyPath = $this->getSshPublicKeyPath();
-        if (!file_exists($pubKeyPath)) {
-            return null;
-        }
-        return trim(file_get_contents($pubKeyPath));
-    }
-
-    public function getDeployKeyUrl(): ?string
-    {
-        $remoteUrl = $this->getRemoteUrl();
-        if (!$remoteUrl) {
-            return null;
-        }
-
-        if (preg_match('/git@github\.com:([^\/]+)\/(.+)$/', $remoteUrl, $matches)) {
-            $owner = $matches[1];
-            $repo = preg_replace('/\.git$/', '', $matches[2]);
-            return "https://github.com/{$owner}/{$repo}/settings/keys/new";
-        }
-
-        if (preg_match('/https:\/\/github\.com\/([^\/]+)\/(.+)$/', $remoteUrl, $matches)) {
-            $owner = $matches[1];
-            $repo = preg_replace('/\.git$/', '', $matches[2]);
-            return "https://github.com/{$owner}/{$repo}/settings/keys/new";
-        }
-
-        if (preg_match('/git@gitlab\.com:([^\/]+)\/(.+)$/', $remoteUrl, $matches)) {
-            $owner = $matches[1];
-            $repo = preg_replace('/\.git$/', '', $matches[2]);
-            return "https://gitlab.com/{$owner}/{$repo}/-/settings/repository#js-deploy-keys-settings";
-        }
-
-        if (preg_match('/https:\/\/gitlab\.com\/([^\/]+)\/(.+)$/', $remoteUrl, $matches)) {
-            $owner = $matches[1];
-            $repo = preg_replace('/\.git$/', '', $matches[2]);
-            return "https://gitlab.com/{$owner}/{$repo}/-/settings/repository#js-deploy-keys-settings";
-        }
-
-        return null;
-    }
-
-    public function deleteSshKey(): array
-    {
-        $keyPath = $this->getSshKeyPath();
-        $deleted = false;
-
-        if (file_exists($keyPath)) {
-            unlink($keyPath);
-            $deleted = true;
-        }
-        if (file_exists($keyPath . '.pub')) {
-            unlink($keyPath . '.pub');
-            $deleted = true;
-        }
-
-        return [
-            'success' => true,
-            'message' => $deleted ? 'SSH Key gelöscht' : 'Kein SSH Key vorhanden',
-        ];
-    }
-
-    public function testSshConnection(): array
-    {
-        if (!$this->hasSshKey()) {
-            return [
-                'success' => false,
-                'message' => 'Kein SSH Key vorhanden. Bitte zuerst generieren.',
-            ];
-        }
-
-        $remoteUrl = $this->getRemoteUrl();
-        if (!$remoteUrl) {
-            return [
-                'success' => false,
-                'message' => 'Keine Remote URL konfiguriert.',
-            ];
-        }
-
-        if (preg_match('/git@([^:]+):/', $remoteUrl, $matches)) {
-            $host = $matches[1];
-        } elseif (preg_match('/https?:\/\/([^\/]+)/', $remoteUrl, $matches)) {
-            return [
-                'success' => false,
-                'message' => 'HTTPS URL erkannt. SSH Key wird nur für SSH URLs benötigt.',
-            ];
-        } else {
-            return [
-                'success' => false,
-                'message' => 'Konnte Host nicht aus URL extrahieren: ' . $remoteUrl,
-            ];
-        }
-
-        $sshCommand = sprintf(
-            'ssh -i %s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -T git@%s 2>&1',
-            escapeshellarg($this->getSshKeyPath()),
-            escapeshellarg($host)
-        );
-
-        $output = [];
-        $returnCode = 0;
-        exec($sshCommand, $output, $returnCode);
-
-        $outputStr = implode("\n", $output);
-
-        $isAuthenticated = strpos($outputStr, 'successfully authenticated') !== false
-            || strpos($outputStr, 'Welcome to GitLab') !== false
-            || strpos($outputStr, 'You\'ve successfully authenticated') !== false;
-
-        return [
-            'success' => $isAuthenticated,
-            'message' => $isAuthenticated
-                ? 'SSH Verbindung erfolgreich!'
-                : 'SSH Verbindung fehlgeschlagen. Bitte Public Key in GitHub/GitLab hinterlegen.',
-            'output' => $outputStr,
-        ];
     }
 
     public function getProjectRoot(): string
     {
-        return $this->projectRoot;
+        return $this->executor->getProjectRoot();
     }
+
+    public function getSshKeyService(): SshKeyService
+    {
+        return $this->sshKeyService;
+    }
+
+    // ── Repository State ──────────────────────────────────────────
 
     public function isGitRepository(): bool
     {
-        return is_dir($this->projectRoot . '/.git');
+        return is_dir($this->executor->getProjectRoot() . '/.git');
     }
 
     public function hasRemote(): bool
@@ -219,7 +46,8 @@ class GitService
             return false;
         }
 
-        $result = $this->executeGitCommand('git remote -v');
+        $result = $this->executor->execute('git remote -v');
+
         return !empty(trim($result['output']));
     }
 
@@ -229,22 +57,25 @@ class GitService
             return null;
         }
 
-        $result = $this->executeGitCommand('git remote get-url origin');
+        $result = $this->executor->execute('git remote get-url origin');
+
         return $result['success'] ? trim($result['output']) : null;
     }
 
+    // ── User Config ───────────────────────────────────────────────
+
     public function hasUserConfig(): bool
     {
-        $nameResult = $this->executeGitCommand('git config user.name');
-        $emailResult = $this->executeGitCommand('git config user.email');
+        $nameResult = $this->executor->execute('git config user.name');
+        $emailResult = $this->executor->execute('git config user.email');
 
         return !empty(trim($nameResult['output'])) && !empty(trim($emailResult['output']));
     }
 
     public function getUserConfig(): array
     {
-        $nameResult = $this->executeGitCommand('git config user.name');
-        $emailResult = $this->executeGitCommand('git config user.email');
+        $nameResult = $this->executor->execute('git config user.name');
+        $emailResult = $this->executor->execute('git config user.email');
 
         return [
             'name' => trim($nameResult['output']),
@@ -252,38 +83,40 @@ class GitService
         ];
     }
 
-    public function setUserConfig(string $name, string $email): array
+    public function setUserConfig(string $name, string $email): GitResult
     {
-        $nameResult = $this->executeGitCommand('git config user.name ' . escapeshellarg($name));
+        $this->validator->validateUserName($name);
+        $this->validator->validateUserEmail($email);
+
+        $nameResult = $this->executor->execute('git config user.name ' . escapeshellarg($name));
         if (!$nameResult['success']) {
-            return [
-                'success' => false,
-                'message' => 'Fehler beim Setzen des Benutzernamens',
-                'output' => $nameResult['output'],
-                'error' => $nameResult['error'],
-            ];
+            return GitResult::failure('Fehler beim Setzen des Benutzernamens', $nameResult['output'], $nameResult['error']);
         }
 
-        $emailResult = $this->executeGitCommand('git config user.email ' . escapeshellarg($email));
+        $emailResult = $this->executor->execute('git config user.email ' . escapeshellarg($email));
         if (!$emailResult['success']) {
-            return [
-                'success' => false,
-                'message' => 'Fehler beim Setzen der E-Mail',
-                'output' => $emailResult['output'],
-                'error' => $emailResult['error'],
-            ];
+            return GitResult::failure('Fehler beim Setzen der E-Mail', $emailResult['output'], $emailResult['error']);
         }
 
-        return [
-            'success' => true,
-            'message' => 'Git Benutzer erfolgreich konfiguriert',
-            'output' => '',
-        ];
+        $this->logger?->info('Git user config set', ['name' => $name, 'email' => $email]);
+
+        return GitResult::success('Git Benutzer erfolgreich konfiguriert');
     }
 
-    public function initRepository(string $remoteUrl, string $branch = 'main', ?string $sshKeyPath = null, ?string $userName = null, ?string $userEmail = null): array
+    // ── Repository Init/Clone ─────────────────────────────────────
+
+    public function initRepository(string $remoteUrl, string $branch = 'main', ?string $userName = null, ?string $userEmail = null): GitResult
     {
+        $this->validator->validateRemoteUrl($remoteUrl);
+        $this->validator->validateBranchName($branch);
+
+        if ($userName && $userEmail) {
+            $this->validator->validateUserName($userName);
+            $this->validator->validateUserEmail($userEmail);
+        }
+
         $this->createDefaultGitignore();
+
         $commands = ['git init'];
 
         if ($userName && $userEmail) {
@@ -294,52 +127,56 @@ class GitService
         $commands[] = 'git remote add origin ' . escapeshellarg($remoteUrl);
         $commands[] = 'git branch -M ' . escapeshellarg($branch);
 
-        $results = [];
+        $allOutput = [];
         foreach ($commands as $command) {
-            $result = $this->executeGitCommand($command, $sshKeyPath);
-            $results[] = $result;
+            $result = $this->executor->execute($command);
+            $allOutput[] = $result['output'];
             if (!$result['success']) {
-                return [
-                    'success' => false,
-                    'message' => 'Fehler beim Ausführen: ' . $command,
-                    'output' => $result['output'],
-                    'error' => $result['error'],
-                ];
+                return GitResult::failure(
+                    'Fehler beim Ausfuehren: ' . $command,
+                    $result['output'],
+                    $result['error']
+                );
             }
         }
 
-        return [
-            'success' => true,
-            'message' => 'Repository erfolgreich initialisiert',
-            'output' => implode("\n", array_column($results, 'output')),
-        ];
+        $this->logger?->info('Repository initialized', ['remote' => $remoteUrl, 'branch' => $branch]);
+
+        return GitResult::success('Repository erfolgreich initialisiert', implode("\n", $allOutput));
     }
 
-    public function cloneRepository(string $remoteUrl, string $branch = 'main', ?string $userName = null, ?string $userEmail = null): array
+    public function cloneRepository(string $remoteUrl, string $branch = 'main', ?string $userName = null, ?string $userEmail = null): GitResult
     {
-        $tempDir = $this->projectRoot . '/temp_git_clone_' . uniqid();
+        $this->validator->validateRemoteUrl($remoteUrl);
+        $this->validator->validateBranchName($branch);
 
-        $cloneResult = $this->executeGitCommand(
-            'git clone --branch ' . escapeshellarg($branch) . ' ' . escapeshellarg($remoteUrl) . ' ' . escapeshellarg($tempDir)
+        if ($userName && $userEmail) {
+            $this->validator->validateUserName($userName);
+            $this->validator->validateUserEmail($userEmail);
+        }
+
+        $tempDir = $this->executor->getProjectRoot() . '/temp_git_clone_' . bin2hex(random_bytes(8));
+
+        $cloneResult = $this->executor->execute(
+            'git clone --branch ' . escapeshellarg($branch) . ' ' . escapeshellarg($remoteUrl) . ' ' . escapeshellarg($tempDir),
+            useLock: true
         );
 
         if (!$cloneResult['success']) {
-            $cloneResult = $this->executeGitCommand(
-                'git clone ' . escapeshellarg($remoteUrl) . ' ' . escapeshellarg($tempDir)
+            $cloneResult = $this->executor->execute(
+                'git clone ' . escapeshellarg($remoteUrl) . ' ' . escapeshellarg($tempDir),
+                useLock: true
             );
         }
 
         if (!$cloneResult['success']) {
-            return [
-                'success' => false,
-                'message' => 'Fehler beim Klonen des Repositories',
-                'output' => $cloneResult['output'],
-                'error' => $cloneResult['error'],
-            ];
+            $this->deleteDirectory($tempDir);
+
+            return GitResult::failure('Fehler beim Klonen des Repositories', $cloneResult['output'], $cloneResult['error']);
         }
 
         $gitDir = $tempDir . '/.git';
-        $targetGitDir = $this->projectRoot . '/.git';
+        $targetGitDir = $this->executor->getProjectRoot() . '/.git';
 
         if (is_dir($targetGitDir)) {
             $this->deleteDirectory($targetGitDir);
@@ -347,31 +184,541 @@ class GitService
 
         if (!rename($gitDir, $targetGitDir)) {
             $this->deleteDirectory($tempDir);
-            return [
-                'success' => false,
-                'message' => 'Fehler beim Verschieben des .git Ordners',
-            ];
+
+            return GitResult::failure('Fehler beim Verschieben des .git Ordners');
         }
 
         $this->deleteDirectory($tempDir);
 
         if ($userName && $userEmail) {
-            $this->executeGitCommand('git config user.name ' . escapeshellarg($userName));
-            $this->executeGitCommand('git config user.email ' . escapeshellarg($userEmail));
+            $this->executor->execute('git config user.name ' . escapeshellarg($userName));
+            $this->executor->execute('git config user.email ' . escapeshellarg($userEmail));
         }
 
-        $resetResult = $this->executeGitCommand('git reset --hard origin/' . escapeshellarg($branch));
+        $this->createDefaultGitignore();
 
-        return [
-            'success' => true,
-            'message' => 'Repository erfolgreich geklont. Die Server-Version ist jetzt aktiv.',
-            'output' => $cloneResult['output'] . "\n" . ($resetResult['output'] ?? ''),
+        $resetResult = $this->executor->execute('git reset --hard origin/' . escapeshellarg($branch));
+
+        $this->logger?->info('Repository cloned', ['remote' => $remoteUrl, 'branch' => $branch]);
+
+        return GitResult::success(
+            'Repository erfolgreich geklont. Die Server-Version ist jetzt aktiv.',
+            $cloneResult['output'] . "\n" . ($resetResult['output'] ?? '')
+        );
+    }
+
+    // ── Branch Operations ─────────────────────────────────────────
+
+    public function getBranches(): array
+    {
+        $result = $this->executor->execute('git branch');
+
+        if (!$result['success']) {
+            return ['main'];
+        }
+
+        $branches = [];
+        foreach (explode("\n", trim($result['output'])) as $line) {
+            $branch = trim(str_replace('*', '', $line));
+            if (!empty($branch)) {
+                $branches[] = $branch;
+            }
+        }
+
+        return $branches ?: ['main'];
+    }
+
+    public function getRemoteBranches(): array
+    {
+        $this->fetch();
+        $result = $this->executor->execute('git branch -r');
+
+        if (!$result['success']) {
+            return [];
+        }
+
+        $branches = [];
+        foreach (explode("\n", trim($result['output'])) as $line) {
+            $branch = trim($line);
+            if (str_starts_with($branch, 'origin/') && !str_contains($branch, 'HEAD')) {
+                $branches[] = substr($branch, 7);
+            }
+        }
+
+        return array_unique($branches);
+    }
+
+    public function getCurrentBranch(): string
+    {
+        $result = $this->executor->execute('git branch --show-current');
+
+        return $result['success'] && !empty(trim($result['output'])) ? trim($result['output']) : 'main';
+    }
+
+    public function switchBranch(string $branch): GitResult
+    {
+        $this->validator->validateBranchName($branch);
+
+        $statusCheck = $this->getStatus();
+        if ($statusCheck->hasChanges()) {
+            $this->executor->execute('git stash push -m "auto-stash before branch switch"');
+            $this->logger?->info('Auto-stashed changes before branch switch', ['branch' => $branch]);
+        }
+
+        $this->fetch();
+        $localBranches = $this->getBranches();
+
+        if (in_array($branch, $localBranches, true)) {
+            $result = $this->executor->execute('git checkout ' . escapeshellarg($branch));
+        } else {
+            $result = $this->executor->execute(
+                'git checkout -b ' . escapeshellarg($branch) . ' origin/' . escapeshellarg($branch)
+            );
+        }
+
+        if (!$result['success']) {
+            if ($statusCheck->hasChanges()) {
+                $this->executor->execute('git stash pop');
+            }
+
+            return GitResult::failure('Fehler beim Wechsel zu Branch: ' . $branch, $result['output'], $result['error']);
+        }
+
+        if ($statusCheck->hasChanges()) {
+            $stashResult = $this->executor->execute('git stash pop');
+            if (!$stashResult['success'] && str_contains($stashResult['output'], 'CONFLICT')) {
+                $this->logger?->warning('Stash pop conflict after branch switch', ['branch' => $branch]);
+
+                return new GitResult(
+                    true,
+                    'Branch gewechselt, aber es gibt Konflikte mit den gestashten Aenderungen. Bitte manuell aufloesen.',
+                    $result['output'] . "\n" . $stashResult['output']
+                );
+            }
+        }
+
+        $this->logger?->info('Switched branch', ['branch' => $branch]);
+
+        return GitResult::success('Erfolgreich zu Branch "' . $branch . '" gewechselt', $result['output']);
+    }
+
+    public function createBranch(string $branchName, bool $pushToRemote = true): GitResult
+    {
+        $this->validator->validateBranchName($branchName);
+
+        $result = $this->executor->execute('git checkout -b ' . escapeshellarg($branchName));
+
+        if (!$result['success']) {
+            return GitResult::failure('Fehler beim Erstellen des Branches', $result['output'], $result['error']);
+        }
+
+        if ($pushToRemote) {
+            $pushResult = $this->executor->execute('git push -u origin ' . escapeshellarg($branchName), useLock: true);
+
+            if (!$pushResult['success']) {
+                return new GitResult(
+                    true,
+                    'Branch lokal erstellt, aber Push zum Remote fehlgeschlagen',
+                    $result['output'] . "\n" . $pushResult['output'],
+                    $pushResult['error']
+                );
+            }
+        }
+
+        $this->logger?->info('Branch created', ['branch' => $branchName, 'pushed' => $pushToRemote]);
+
+        return GitResult::success('Branch "' . $branchName . '" erfolgreich erstellt', $result['output']);
+    }
+
+    public function renameBranch(string $oldName, string $newName): GitResult
+    {
+        $this->validator->validateBranchName($newName);
+
+        if ($this->validator->isProtectedBranch($oldName)) {
+            return GitResult::failure('Der Branch "' . $oldName . '" ist geschuetzt und kann nicht umbenannt werden.');
+        }
+
+        $result = $this->executor->execute(
+            'git branch -m ' . escapeshellarg($oldName) . ' ' . escapeshellarg($newName)
+        );
+
+        if (!$result['success']) {
+            return GitResult::failure('Fehler beim Umbenennen des Branches', $result['output'], $result['error']);
+        }
+
+        $this->executor->execute('git push origin --delete ' . escapeshellarg($oldName), useLock: true);
+        $pushResult = $this->executor->execute('git push -u origin ' . escapeshellarg($newName), useLock: true);
+
+        $this->logger?->info('Branch renamed', ['old' => $oldName, 'new' => $newName]);
+
+        return GitResult::success(
+            'Branch von "' . $oldName . '" zu "' . $newName . '" umbenannt',
+            $result['output'] . "\n" . ($pushResult['output'] ?? '')
+        );
+    }
+
+    public function deleteBranch(string $branchName, bool $deleteRemote = true): GitResult
+    {
+        $currentBranch = $this->getCurrentBranch();
+        $this->validator->validateBranchDeletion($branchName, $currentBranch);
+
+        $result = $this->executor->execute('git branch -D ' . escapeshellarg($branchName));
+
+        if (!$result['success']) {
+            return GitResult::failure('Fehler beim Loeschen des lokalen Branches', $result['output'], $result['error']);
+        }
+
+        if ($deleteRemote) {
+            $remoteResult = $this->executor->execute(
+                'git push origin --delete ' . escapeshellarg($branchName),
+                useLock: true
+            );
+
+            if (!$remoteResult['success']) {
+                return new GitResult(
+                    true,
+                    'Branch lokal geloescht, aber Remote-Loeschung fehlgeschlagen',
+                    $result['output'] . "\n" . $remoteResult['output']
+                );
+            }
+        }
+
+        $this->logger?->info('Branch deleted', ['branch' => $branchName, 'remote' => $deleteRemote]);
+
+        return GitResult::success('Branch "' . $branchName . '" erfolgreich geloescht', $result['output']);
+    }
+
+    // ── Remote Operations ─────────────────────────────────────────
+
+    public function addRemote(string $remoteUrl): GitResult
+    {
+        $this->validator->validateRemoteUrl($remoteUrl);
+
+        $result = $this->executor->execute('git remote add origin ' . escapeshellarg($remoteUrl));
+
+        if (!$result['success']) {
+            $result = $this->executor->execute('git remote set-url origin ' . escapeshellarg($remoteUrl));
+        }
+
+        $this->logger?->info('Remote added/updated', ['url' => $remoteUrl]);
+
+        return new GitResult(
+            $result['success'],
+            $result['success'] ? 'Remote erfolgreich hinzugefuegt' : 'Fehler beim Hinzufuegen des Remote',
+            $result['output'],
+            $result['error'] ?? ''
+        );
+    }
+
+    public function setRemoteUrl(string $remoteUrl): GitResult
+    {
+        $this->validator->validateRemoteUrl($remoteUrl);
+
+        $result = $this->executor->execute('git remote set-url origin ' . escapeshellarg($remoteUrl));
+
+        $this->logger?->info('Remote URL changed', ['url' => $remoteUrl]);
+
+        return new GitResult(
+            $result['success'],
+            $result['success'] ? 'Remote URL erfolgreich geaendert' : 'Fehler beim Aendern der Remote URL',
+            $result['output'],
+            $result['error'] ?? ''
+        );
+    }
+
+    public function fetch(): GitResult
+    {
+        $result = $this->executor->execute('git fetch origin');
+
+        return new GitResult($result['success'], '', $result['output'], $result['error'] ?? '');
+    }
+
+    // ── Status & Info ─────────────────────────────────────────────
+
+    public function getStatus(): GitStatus
+    {
+        $result = $this->executor->execute('git status --porcelain');
+
+        if (!$result['success']) {
+            return new GitStatus();
+        }
+
+        $modified = [];
+        $added = [];
+        $deleted = [];
+        $untracked = [];
+
+        foreach (array_filter(explode("\n", rtrim($result['output']))) as $line) {
+            $status = substr($line, 0, 2);
+            $file = trim(substr($line, 3));
+
+            if (str_contains($status, 'M')) {
+                $modified[] = $file;
+            } elseif (str_contains($status, 'A')) {
+                $added[] = $file;
+            } elseif (str_contains($status, 'D')) {
+                $deleted[] = $file;
+            } elseif (str_contains($status, '?')) {
+                $untracked[] = $file;
+            }
+        }
+
+        return new GitStatus($modified, $added, $deleted, $untracked);
+    }
+
+    public function getRemoteStatus(): RemoteStatus
+    {
+        $this->fetch();
+        $branch = $this->getCurrentBranch();
+
+        $behindResult = $this->executor->execute('git rev-list HEAD..origin/' . escapeshellarg($branch) . ' --count');
+        $behind = $behindResult['success'] ? (int) trim($behindResult['output']) : 0;
+
+        $aheadResult = $this->executor->execute('git rev-list origin/' . escapeshellarg($branch) . '..HEAD --count');
+        $ahead = $aheadResult['success'] ? (int) trim($aheadResult['output']) : 0;
+
+        return new RemoteStatus($ahead, $behind);
+    }
+
+    public function getLastCommit(): ?CommitInfo
+    {
+        $result = $this->executor->execute('git log -1 --format="%H|%s|%ci"');
+
+        if (!$result['success'] || empty(trim($result['output']))) {
+            return null;
+        }
+
+        $parts = explode('|', trim($result['output']), 3);
+
+        return new CommitInfo(
+            hash: $parts[0] ?? '',
+            shortHash: substr($parts[0] ?? '', 0, 7),
+            message: $parts[1] ?? '',
+            date: $parts[2] ?? '',
+        );
+    }
+
+    /**
+     * @return CommitInfo[]
+     */
+    public function getCommitHistory(int $limit = 20): array
+    {
+        $this->fetch();
+        $branch = $this->getCurrentBranch();
+
+        $result = $this->executor->execute(
+            'git log origin/' . escapeshellarg($branch) . ' --format="%H|%s|%an|%ci" -n ' . max(1, min($limit, 100))
+        );
+
+        if (!$result['success'] || empty(trim($result['output']))) {
+            return [];
+        }
+
+        $commits = [];
+        foreach (explode("\n", trim($result['output'])) as $line) {
+            if (empty(trim($line))) {
+                continue;
+            }
+
+            $parts = explode('|', $line, 4);
+            $commits[] = new CommitInfo(
+                hash: $parts[0] ?? '',
+                shortHash: substr($parts[0] ?? '', 0, 7),
+                message: $parts[1] ?? '',
+                author: $parts[2] ?? '',
+                date: $parts[3] ?? '',
+            );
+        }
+
+        return $commits;
+    }
+
+    public function getStatusText(): string
+    {
+        $result = $this->executor->execute('git status');
+
+        return $result['output'];
+    }
+
+    // ── Commit & Push ─────────────────────────────────────────────
+
+    public function commitAndPush(string $message, string $branch, bool $forcePush = false): GitResult
+    {
+        $this->validator->validateCommitMessage($message);
+        $this->validator->validateBranchName($branch);
+
+        if ($forcePush && $this->validator->isProtectedBranch($branch)) {
+            return GitResult::failure(
+                'Force Push auf geschuetzten Branch "' . $branch . '" ist nicht erlaubt. '
+                . 'Bitte verwenden Sie einen normalen Push oder erstellen Sie einen Pull Request.'
+            );
+        }
+
+        $this->cleanIgnoredFromIndex();
+
+        $addResult = $this->executor->execute('git add .', useLock: true);
+        if (!$addResult['success']) {
+            return GitResult::failure('Fehler bei git add', $addResult['output'], $addResult['error']);
+        }
+
+        $commitResult = $this->executor->execute('git commit -m ' . escapeshellarg($message), useLock: true);
+        if (!$commitResult['success'] && !str_contains($commitResult['output'], 'nothing to commit')) {
+            return GitResult::failure('Fehler bei git commit', $commitResult['output'], $commitResult['error']);
+        }
+
+        $forceFlag = $forcePush ? ' --force-with-lease' : '';
+        $pushResult = $this->executor->execute(
+            'git push' . $forceFlag . ' origin ' . escapeshellarg($branch),
+            useLock: true
+        );
+
+        if (!$pushResult['success'] && !$forcePush) {
+            $pushResult = $this->executor->execute(
+                'git push --set-upstream origin ' . escapeshellarg($branch),
+                useLock: true
+            );
+        }
+
+        if (!$pushResult['success']) {
+            $this->logger?->error('Push failed', [
+                'branch' => $branch,
+                'forcePush' => $forcePush,
+                'output' => mb_substr($pushResult['output'], 0, 500),
+            ]);
+
+            return GitResult::failure(
+                'Push fehlgeschlagen. Moegliche Ursache: Remote hat neuere Aenderungen. Bitte zuerst Pull ausfuehren.',
+                $commitResult['output'] . "\n" . $pushResult['output'],
+                $pushResult['error']
+            );
+        }
+
+        $this->logger?->info('Commit and push successful', ['branch' => $branch, 'force' => $forcePush]);
+
+        return GitResult::success(
+            'Commit und Push erfolgreich',
+            $commitResult['output'] . "\n" . $pushResult['output']
+        );
+    }
+
+    // ── Pull ──────────────────────────────────────────────────────
+
+    public function pull(string $branch): GitResult
+    {
+        $this->validator->validateBranchName($branch);
+
+        $status = $this->getStatus();
+        $hadChanges = $status->hasChanges();
+
+        if ($hadChanges) {
+            $this->executor->execute('git stash push -m "auto-stash before pull"', useLock: true);
+            $this->logger?->info('Auto-stashed changes before pull');
+        }
+
+        $result = $this->executor->execute('git pull origin ' . escapeshellarg($branch), useLock: true);
+
+        if (str_contains($result['output'], 'CONFLICT') || str_contains($result['error'], 'CONFLICT')) {
+            $this->executor->execute('git merge --abort');
+            if ($hadChanges) {
+                $this->executor->execute('git stash pop');
+            }
+
+            $this->logger?->warning('Pull conflict detected, merge aborted', ['branch' => $branch]);
+
+            throw new GitConflictException(
+                'Konflikte beim Pull erkannt! Der Merge wurde automatisch abgebrochen. '
+                . 'Bitte koordinieren Sie mit dem Entwickler, um die Konflikte aufzuloesen.',
+                $result['output']
+            );
+        }
+
+        if (!$result['success']) {
+            if ($hadChanges) {
+                $this->executor->execute('git stash pop');
+            }
+
+            return GitResult::failure('Fehler beim Pull', $result['output'], $result['error']);
+        }
+
+        if ($hadChanges) {
+            $stashResult = $this->executor->execute('git stash pop');
+            if (!$stashResult['success'] && str_contains($stashResult['output'], 'CONFLICT')) {
+                $this->logger?->warning('Stash pop conflict after pull');
+
+                return new GitResult(
+                    true,
+                    'Pull erfolgreich, aber es gibt Konflikte mit lokalen Aenderungen. Bitte manuell pruefen.',
+                    $result['output'] . "\n" . $stashResult['output']
+                );
+            }
+        }
+
+        $this->logger?->info('Pull successful', ['branch' => $branch]);
+
+        return GitResult::success('Pull erfolgreich', $result['output']);
+    }
+
+    // ── Checkout / Restore ────────────────────────────────────────
+
+    public function checkoutCommit(string $commitHash): GitResult
+    {
+        $this->validator->validateCommitHash($commitHash);
+
+        $this->executor->execute('git stash push -m "auto-stash before checkout"');
+        $result = $this->executor->execute('git reset --hard ' . escapeshellarg($commitHash));
+
+        if (!$result['success']) {
+            return GitResult::failure('Fehler beim Wechsel zum Commit', $result['output'], $result['error']);
+        }
+
+        $this->logger?->info('Checked out commit', ['hash' => substr($commitHash, 0, 7)]);
+
+        return GitResult::success(
+            'Erfolgreich zu Commit ' . substr($commitHash, 0, 7) . ' gewechselt',
+            $result['output']
+        );
+    }
+
+    public function checkoutLatest(): GitResult
+    {
+        $branch = $this->getCurrentBranch();
+        $result = $this->executor->execute('git checkout ' . escapeshellarg($branch));
+
+        if (!$result['success']) {
+            $result = $this->executor->execute('git reset --hard origin/' . escapeshellarg($branch));
+        }
+
+        $this->logger?->info('Checked out latest', ['branch' => $branch]);
+
+        return new GitResult(
+            $result['success'],
+            $result['success']
+                ? 'Zurueck zum aktuellen Stand (' . $branch . ')'
+                : 'Fehler beim Zuruecksetzen',
+            $result['output'],
+            $result['error'] ?? ''
+        );
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────
+
+    private function cleanIgnoredFromIndex(): void
+    {
+        $paths = [
+            'vendor/', 'var/', '.env.local', 'contao-manager/',
+            'files/', 'assets/', 'node_modules/',
+            'public/bundles/', 'public/assets/', 'public/share/', 'public/system/',
+            'system/tmp/', 'system/config/localconfig.php',
         ];
+
+        foreach ($paths as $path) {
+            $this->executor->execute('git rm -r --cached --ignore-unmatch ' . escapeshellarg($path));
+        }
     }
 
     private function createDefaultGitignore(): void
     {
-        $gitignorePath = $this->projectRoot . '/.gitignore';
+        $gitignorePath = $this->executor->getProjectRoot() . '/.gitignore';
         if (file_exists($gitignorePath)) {
             return;
         }
@@ -429,560 +776,5 @@ GITIGNORE;
         }
 
         return rmdir($dir);
-    }
-
-    public function getRemoteBranches(): array
-    {
-        $this->fetch();
-        $result = $this->executeGitCommand('git branch -r');
-
-        if (!$result['success']) {
-            return [];
-        }
-
-        $branches = [];
-        $lines = explode("\n", trim($result['output']));
-
-        foreach ($lines as $line) {
-            $branch = trim($line);
-            if (strpos($branch, 'origin/') === 0 && strpos($branch, 'HEAD') === false) {
-                $branches[] = substr($branch, 7);
-            }
-        }
-
-        return array_unique($branches);
-    }
-
-    public function switchBranch(string $branch): array
-    {
-        $this->fetch();
-        $localBranches = $this->getBranches();
-
-        if (in_array($branch, $localBranches)) {
-            $result = $this->executeGitCommand('git checkout ' . escapeshellarg($branch));
-        } else {
-            $result = $this->executeGitCommand(
-                'git checkout -b ' . escapeshellarg($branch) . ' origin/' . escapeshellarg($branch)
-            );
-        }
-
-        if (!$result['success']) {
-            return [
-                'success' => false,
-                'message' => 'Fehler beim Wechsel zu Branch: ' . $branch,
-                'output' => $result['output'],
-                'error' => $result['error'],
-            ];
-        }
-
-        return [
-            'success' => true,
-            'message' => 'Erfolgreich zu Branch "' . $branch . '" gewechselt',
-            'output' => $result['output'],
-        ];
-    }
-
-    public function createBranch(string $branchName, bool $pushToRemote = true): array
-    {
-        if (!preg_match('/^[a-zA-Z0-9\-_\/]+$/', $branchName)) {
-            return [
-                'success' => false,
-                'message' => 'Ungültiger Branch-Name. Erlaubt: Buchstaben, Zahlen, -, _, /',
-            ];
-        }
-
-        $result = $this->executeGitCommand('git checkout -b ' . escapeshellarg($branchName));
-
-        if (!$result['success']) {
-            return [
-                'success' => false,
-                'message' => 'Fehler beim Erstellen des Branches',
-                'output' => $result['output'],
-                'error' => $result['error'],
-            ];
-        }
-
-        if ($pushToRemote) {
-            $pushResult = $this->executeGitCommand('git push -u origin ' . escapeshellarg($branchName));
-
-            if (!$pushResult['success']) {
-                return [
-                    'success' => true,
-                    'message' => 'Branch lokal erstellt, aber Push zum Remote fehlgeschlagen',
-                    'output' => $result['output'] . "\n" . $pushResult['output'],
-                    'error' => $pushResult['error'],
-                ];
-            }
-        }
-
-        return [
-            'success' => true,
-            'message' => 'Branch "' . $branchName . '" erfolgreich erstellt',
-            'output' => $result['output'],
-        ];
-    }
-
-    public function hasRemoteChanges(): bool
-    {
-        $this->fetch();
-        $branch = $this->getCurrentBranch();
-        $result = $this->executeGitCommand('git rev-list HEAD..origin/' . escapeshellarg($branch) . ' --count');
-
-        if (!$result['success']) {
-            return false;
-        }
-
-        return (int)trim($result['output']) > 0;
-    }
-
-    public function getRemoteStatus(): array
-    {
-        $this->fetch();
-        $branch = $this->getCurrentBranch();
-
-        $behindResult = $this->executeGitCommand('git rev-list HEAD..origin/' . escapeshellarg($branch) . ' --count');
-        $behind = $behindResult['success'] ? (int)trim($behindResult['output']) : 0;
-
-        $aheadResult = $this->executeGitCommand('git rev-list origin/' . escapeshellarg($branch) . '..HEAD --count');
-        $ahead = $aheadResult['success'] ? (int)trim($aheadResult['output']) : 0;
-
-        return [
-            'behind' => $behind,
-            'ahead' => $ahead,
-            'synced' => ($behind === 0 && $ahead === 0),
-        ];
-    }
-
-    public function addRemote(string $remoteUrl): array
-    {
-        $result = $this->executeGitCommand('git remote add origin ' . escapeshellarg($remoteUrl));
-
-        if (!$result['success']) {
-            $result = $this->executeGitCommand('git remote set-url origin ' . escapeshellarg($remoteUrl));
-        }
-
-        return [
-            'success' => $result['success'],
-            'message' => $result['success'] ? 'Remote erfolgreich hinzugefügt' : 'Fehler beim Hinzufügen des Remote',
-            'output' => $result['output'],
-            'error' => $result['error'] ?? '',
-        ];
-    }
-
-    public function setRemoteUrl(string $remoteUrl): array
-    {
-        $result = $this->executeGitCommand('git remote set-url origin ' . escapeshellarg($remoteUrl));
-
-        return [
-            'success' => $result['success'],
-            'message' => $result['success'] ? 'Remote URL erfolgreich geändert' : 'Fehler beim Ändern der Remote URL',
-            'output' => $result['output'],
-            'error' => $result['error'] ?? '',
-        ];
-    }
-
-    public function renameBranch(string $oldName, string $newName): array
-    {
-        if (!preg_match('/^[a-zA-Z0-9\-_\/]+$/', $newName)) {
-            return [
-                'success' => false,
-                'message' => 'Ungültiger Branch-Name. Erlaubt: Buchstaben, Zahlen, -, _, /',
-            ];
-        }
-
-        $result = $this->executeGitCommand('git branch -m ' . escapeshellarg($oldName) . ' ' . escapeshellarg($newName));
-
-        if (!$result['success']) {
-            return [
-                'success' => false,
-                'message' => 'Fehler beim Umbenennen des Branches',
-                'output' => $result['output'],
-                'error' => $result['error'],
-            ];
-        }
-
-        $this->executeGitCommand('git push origin --delete ' . escapeshellarg($oldName));
-        $pushResult = $this->executeGitCommand('git push -u origin ' . escapeshellarg($newName));
-
-        return [
-            'success' => true,
-            'message' => 'Branch von "' . $oldName . '" zu "' . $newName . '" umbenannt',
-            'output' => $result['output'] . "\n" . ($pushResult['output'] ?? ''),
-        ];
-    }
-
-    public function deleteBranch(string $branchName, bool $deleteRemote = true): array
-    {
-        $currentBranch = $this->getCurrentBranch();
-
-        if ($branchName === $currentBranch) {
-            return [
-                'success' => false,
-                'message' => 'Kann den aktiven Branch nicht löschen. Bitte zuerst zu einem anderen Branch wechseln.',
-            ];
-        }
-
-        $result = $this->executeGitCommand('git branch -D ' . escapeshellarg($branchName));
-
-        if (!$result['success']) {
-            return [
-                'success' => false,
-                'message' => 'Fehler beim Löschen des lokalen Branches',
-                'output' => $result['output'],
-                'error' => $result['error'],
-            ];
-        }
-
-        if ($deleteRemote) {
-            $remoteResult = $this->executeGitCommand('git push origin --delete ' . escapeshellarg($branchName));
-
-            if (!$remoteResult['success']) {
-                return [
-                    'success' => true,
-                    'message' => 'Branch lokal gelöscht, aber Remote-Löschung fehlgeschlagen',
-                    'output' => $result['output'] . "\n" . $remoteResult['output'],
-                ];
-            }
-        }
-
-        return [
-            'success' => true,
-            'message' => 'Branch "' . $branchName . '" erfolgreich gelöscht',
-            'output' => $result['output'],
-        ];
-    }
-
-    public function fetch(?string $sshKeyPath = null): array
-    {
-        return $this->executeGitCommand('git fetch origin', $sshKeyPath);
-    }
-
-    public function pull(string $branch, ?string $sshKeyPath = null): array
-    {
-        $result = $this->executeGitCommand('git pull origin ' . escapeshellarg($branch), $sshKeyPath);
-
-        if (strpos($result['output'], 'CONFLICT') !== false || strpos($result['error'], 'CONFLICT') !== false) {
-            return [
-                'success' => false,
-                'message' => 'Konflikte beim Pull erkannt! Bitte manuell auflösen.',
-                'output' => $result['output'],
-                'error' => $result['error'],
-                'hasConflicts' => true,
-            ];
-        }
-
-        return [
-            'success' => $result['success'],
-            'message' => $result['success'] ? 'Pull erfolgreich' : 'Fehler beim Pull',
-            'output' => $result['output'],
-            'error' => $result['error'],
-            'hasConflicts' => false,
-        ];
-    }
-
-    public function getStatus(): array
-    {
-        $result = $this->executeGitCommand('git status --porcelain');
-
-        if (!$result['success']) {
-            return [
-                'success' => false,
-                'message' => 'Fehler beim Abrufen des Status',
-                'output' => $result['output'],
-                'error' => $result['error'],
-            ];
-        }
-
-        $lines = array_filter(explode("\n", trim($result['output'])));
-        $changes = [
-            'modified' => [],
-            'added' => [],
-            'deleted' => [],
-            'untracked' => [],
-        ];
-
-        foreach ($lines as $line) {
-            $status = substr($line, 0, 2);
-            $file = trim(substr($line, 3));
-
-            if (strpos($status, 'M') !== false) {
-                $changes['modified'][] = $file;
-            } elseif (strpos($status, 'A') !== false) {
-                $changes['added'][] = $file;
-            } elseif (strpos($status, 'D') !== false) {
-                $changes['deleted'][] = $file;
-            } elseif (strpos($status, '?') !== false) {
-                $changes['untracked'][] = $file;
-            }
-        }
-
-        return [
-            'success' => true,
-            'changes' => $changes,
-            'hasChanges' => !empty($lines),
-            'output' => $result['output'],
-        ];
-    }
-
-    public function getBranches(): array
-    {
-        $result = $this->executeGitCommand('git branch');
-
-        if (!$result['success']) {
-            return ['main'];
-        }
-
-        $branches = [];
-        $lines = explode("\n", trim($result['output']));
-
-        foreach ($lines as $line) {
-            $branch = trim(str_replace('*', '', $line));
-            if (!empty($branch)) {
-                $branches[] = $branch;
-            }
-        }
-
-        return $branches ?: ['main'];
-    }
-
-    public function getCurrentBranch(): string
-    {
-        $result = $this->executeGitCommand('git branch --show-current');
-        return $result['success'] ? trim($result['output']) : 'main';
-    }
-
-    public function commitAndPush(string $message, string $branch, ?string $sshKeyPath = null, bool $forcePush = false): array
-    {
-        $this->cleanIgnoredFromIndex();
-
-        $addResult = $this->executeGitCommand('git add .');
-        if (!$addResult['success']) {
-            return [
-                'success' => false,
-                'message' => 'Fehler bei git add',
-                'output' => $addResult['output'],
-                'error' => $addResult['error'],
-            ];
-        }
-
-        $commitResult = $this->executeGitCommand('git commit -m ' . escapeshellarg($message));
-        if (!$commitResult['success'] && strpos($commitResult['output'], 'nothing to commit') === false) {
-            return [
-                'success' => false,
-                'message' => 'Fehler bei git commit',
-                'output' => $commitResult['output'],
-                'error' => $commitResult['error'],
-            ];
-        }
-
-        $forceFlag = $forcePush ? ' --force' : '';
-        $pushResult = $this->executeGitCommand(
-            'git push' . $forceFlag . ' origin ' . escapeshellarg($branch),
-            $sshKeyPath
-        );
-
-        if (!$pushResult['success'] && !$forcePush) {
-            $pushResult = $this->executeGitCommand(
-                'git push --set-upstream origin ' . escapeshellarg($branch),
-                $sshKeyPath
-            );
-        }
-
-        if (!$pushResult['success'] && !$forcePush) {
-            $pushResult = $this->executeGitCommand(
-                'git push --force origin ' . escapeshellarg($branch),
-                $sshKeyPath
-            );
-        }
-
-        return [
-            'success' => $pushResult['success'],
-            'message' => $pushResult['success'] ? 'Commit und Push erfolgreich' : 'Fehler beim Push',
-            'output' => $commitResult['output'] . "\n" . $pushResult['output'],
-            'error' => $pushResult['error'],
-        ];
-    }
-
-    public function getLastCommit(): array
-    {
-        $result = $this->executeGitCommand('git log -1 --format="%H|%s|%ci"');
-
-        if (!$result['success'] || empty(trim($result['output']))) {
-            return [
-                'success' => false,
-                'message' => 'Keine Commits vorhanden',
-            ];
-        }
-
-        $parts = explode('|', trim($result['output']));
-
-        return [
-            'success' => true,
-            'hash' => $parts[0] ?? '',
-            'shortHash' => substr($parts[0] ?? '', 0, 7),
-            'message' => $parts[1] ?? '',
-            'date' => $parts[2] ?? '',
-        ];
-    }
-
-    public function getCommitHistory(int $limit = 20): array
-    {
-        $this->fetch();
-        $branch = $this->getCurrentBranch();
-        $result = $this->executeGitCommand('git log origin/' . escapeshellarg($branch) . ' --format="%H|%s|%an|%ci" -n ' . (int)$limit);
-
-        if (!$result['success'] || empty(trim($result['output']))) {
-            return [];
-        }
-
-        $commits = [];
-        $lines = explode("\n", trim($result['output']));
-
-        foreach ($lines as $line) {
-            if (empty(trim($line))) {
-                continue;
-            }
-
-            $parts = explode('|', $line, 4);
-            $commits[] = [
-                'hash' => $parts[0] ?? '',
-                'shortHash' => substr($parts[0] ?? '', 0, 7),
-                'message' => $parts[1] ?? '',
-                'author' => $parts[2] ?? '',
-                'date' => $parts[3] ?? '',
-            ];
-        }
-
-        return $commits;
-    }
-
-    public function checkoutCommit(string $commitHash): array
-    {
-        if (!preg_match('/^[a-f0-9]{7,40}$/i', $commitHash)) {
-            return [
-                'success' => false,
-                'message' => 'Ungültiger Commit Hash',
-            ];
-        }
-
-        $this->executeGitCommand('git stash');
-        $result = $this->executeGitCommand('git reset --hard ' . escapeshellarg($commitHash));
-
-        if (!$result['success']) {
-            return [
-                'success' => false,
-                'message' => 'Fehler beim Wechsel zum Commit',
-                'output' => $result['output'],
-                'error' => $result['error'],
-            ];
-        }
-
-        return [
-            'success' => true,
-            'message' => 'Erfolgreich zu Commit ' . substr($commitHash, 0, 7) . ' gewechselt',
-            'output' => $result['output'],
-        ];
-    }
-
-    public function checkoutLatest(): array
-    {
-        $branch = $this->getCurrentBranch();
-        $result = $this->executeGitCommand('git checkout ' . escapeshellarg($branch));
-
-        if (!$result['success']) {
-            $result = $this->executeGitCommand('git reset --hard origin/' . escapeshellarg($branch));
-        }
-
-        return [
-            'success' => $result['success'],
-            'message' => $result['success']
-                ? 'Zurück zum aktuellen Stand (' . $branch . ')'
-                : 'Fehler beim Zurücksetzen',
-            'output' => $result['output'],
-            'error' => $result['error'] ?? '',
-        ];
-    }
-
-    public function getStatusText(): string
-    {
-        $result = $this->executeGitCommand('git status');
-        return $result['output'];
-    }
-
-    private function ensureSafeDirectory(): void
-    {
-        if ($this->safeDirectoryAdded) {
-            return;
-        }
-
-        exec('git config --global --add safe.directory ' . escapeshellarg($this->projectRoot) . ' 2>&1');
-        $this->safeDirectoryAdded = true;
-    }
-
-    private function cleanIgnoredFromIndex(): void
-    {
-        $paths = [
-            'vendor/',
-            'var/',
-            '.env.local',
-            'contao-manager/',
-            'files/',
-            'assets/',
-            'node_modules/',
-            'public/bundles/',
-            'public/assets/',
-            'public/share/',
-            'public/system/',
-            'system/tmp/',
-            'system/config/localconfig.php',
-        ];
-
-        foreach ($paths as $path) {
-            $this->executeGitCommand('git rm -r --cached --ignore-unmatch ' . escapeshellarg($path));
-        }
-    }
-
-    private function executeGitCommand(string $command, ?string $sshKeyPath = null): array
-    {
-        $this->ensureSafeDirectory();
-
-        $env = '';
-        $sshCommands = ['push', 'pull', 'fetch', 'clone', 'ls-remote'];
-        $needsSshConfig = false;
-
-        foreach ($sshCommands as $sshCmd) {
-            if (strpos($command, 'git ' . $sshCmd) !== false) {
-                $needsSshConfig = true;
-                break;
-            }
-        }
-
-        if ($needsSshConfig) {
-            if (!$sshKeyPath && $this->hasSshKey()) {
-                $sshKeyPath = $this->getSshKeyPath();
-            }
-
-            if ($sshKeyPath && file_exists($sshKeyPath)) {
-                $sshCommand = 'ssh -i ' . escapeshellarg($sshKeyPath) . ' -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null';
-            } else {
-                $sshCommand = 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null';
-            }
-            $env = 'GIT_SSH_COMMAND=' . escapeshellarg($sshCommand) . ' ';
-        }
-
-        $fullCommand = 'cd ' . escapeshellarg($this->projectRoot) . ' && ' . $env . $command . ' 2>&1';
-
-        $output = [];
-        $returnCode = 0;
-        exec($fullCommand, $output, $returnCode);
-
-        $outputStr = implode("\n", $output);
-
-        return [
-            'success' => $returnCode === 0,
-            'output' => $outputStr,
-            'error' => $returnCode !== 0 ? $outputStr : '',
-            'returnCode' => $returnCode,
-        ];
     }
 }
