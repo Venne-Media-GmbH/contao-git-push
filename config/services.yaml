@@ -9,6 +9,8 @@ services:
 
     VennMedia\VmGitPushBundle\Service\SshKeyService: ~
 
+    VennMedia\VmGitPushBundle\Service\GitHostingApiService: ~
+
     VennMedia\VmGitPushBundle\Validator\GitInputValidator: ~
 
     VennMedia\VmGitPushBundle\Service\GitService: ~

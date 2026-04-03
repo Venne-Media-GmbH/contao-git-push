@@ -90,6 +90,7 @@ class GitPushController extends AbstractBackendController
     {
         return match ($action) {
             'init' => $this->handleInit($request),
+            'auto_setup' => $this->handleAutoSetup($request),
             'clone' => $this->handleClone($request),
             'add_remote' => $this->handleAddRemote($request),
             'change_remote_url' => $this->handleChangeRemoteUrl($request),
@@ -175,6 +176,27 @@ class GitPushController extends AbstractBackendController
         $userEmail = trim($request->request->getString('git_user_email'));
 
         $result = $this->gitService->initRepository($remoteUrl, $branch, $userName ?: null, $userEmail ?: null);
+
+        return $this->formatResult($result);
+    }
+
+    private function handleAutoSetup(Request $request): array
+    {
+        $provider = trim($request->request->getString('provider'));
+        $token = trim($request->request->getString('api_token'));
+        $repoName = trim($request->request->getString('repo_name'));
+        $private = (bool) $request->request->get('repo_private', true);
+        $branch = trim($request->request->getString('branch', 'main'));
+        $userName = trim($request->request->getString('git_user_name'));
+        $userEmail = trim($request->request->getString('git_user_email'));
+
+        if (!in_array($provider, ['github', 'gitlab'], true)) {
+            return ['message' => 'Bitte wählen Sie GitHub oder GitLab.', 'type' => 'error'];
+        }
+
+        $result = $this->gitService->autoSetupRepository(
+            $provider, $token, $repoName, $private, $branch, $userName, $userEmail
+        );
 
         return $this->formatResult($result);
     }

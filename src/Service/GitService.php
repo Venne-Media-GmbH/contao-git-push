@@ -19,6 +19,7 @@ class GitService
         private readonly GitCommandExecutor $executor,
         private readonly GitInputValidator $validator,
         private readonly SshKeyService $sshKeyService,
+        private readonly GitHostingApiService $hostingApi,
         private readonly ?LoggerInterface $logger = null,
     ) {
     }
@@ -31,6 +32,11 @@ class GitService
     public function getSshKeyService(): SshKeyService
     {
         return $this->sshKeyService;
+    }
+
+    public function getHostingApi(): GitHostingApiService
+    {
+        return $this->hostingApi;
     }
 
     // ── Repository State ──────────────────────────────────────────
@@ -183,6 +189,147 @@ class GitService
         return GitResult::success(
             'Repository eingerichtet. Erster Push konnte nicht durchgeführt werden - bitte manuell pushen.',
             implode("\n", $allOutput) . "\n" . $pushResult['output']
+        );
+    }
+
+    /**
+     * Vollautomatisches Setup: Repo auf GitHub/GitLab erstellen, SSH Key generieren,
+     * Deploy Key eintragen, git init, erster Commit, erster Push - alles in einem Schritt.
+     */
+    public function autoSetupRepository(
+        string $provider,
+        string $token,
+        string $repoName,
+        bool $private,
+        string $branch,
+        string $userName,
+        string $userEmail,
+    ): GitResult {
+        $this->validator->validateBranchName($branch);
+        $this->validator->validateUserName($userName);
+        $this->validator->validateUserEmail($userEmail);
+
+        if (empty(trim($token))) {
+            return GitResult::failure('Bitte geben Sie einen API Token ein.');
+        }
+
+        if (empty(trim($repoName))) {
+            return GitResult::failure('Bitte geben Sie einen Repository-Namen ein.');
+        }
+
+        $steps = [];
+
+        // 1. Token validieren
+        if ($provider === 'github') {
+            $tokenCheck = $this->hostingApi->validateGitHubToken($token);
+        } else {
+            $tokenCheck = $this->hostingApi->validateGitLabToken($token);
+        }
+
+        if (!$tokenCheck['success']) {
+            return GitResult::failure('API Token ist ungültig. Bitte prüfen Sie den Token und die Berechtigungen.');
+        }
+        $steps[] = 'Token geprüft (' . $tokenCheck['username'] . ')';
+
+        // 2. Repository erstellen
+        if ($provider === 'github') {
+            $repoResult = $this->hostingApi->createGitHubRepo($token, $repoName, $private);
+        } else {
+            $repoResult = $this->hostingApi->createGitLabRepo($token, $repoName, $private);
+        }
+
+        if (!$repoResult['success']) {
+            return GitResult::failure($repoResult['message']);
+        }
+        $steps[] = 'Repository erstellt: ' . ($repoResult['full_name'] ?? $repoName);
+
+        $sshUrl = $repoResult['ssh_url'];
+        if (!$sshUrl) {
+            return GitResult::failure('Repository erstellt, aber keine SSH-URL erhalten.');
+        }
+
+        // 3. SSH Key generieren
+        if (!$this->sshKeyService->hasSshKey()) {
+            $sshResult = $this->sshKeyService->generateSshKey();
+            if (!$sshResult->success) {
+                return GitResult::failure('Repository erstellt, aber SSH Key konnte nicht generiert werden.');
+            }
+            $steps[] = 'SSH Key generiert';
+        } else {
+            $steps[] = 'SSH Key bereits vorhanden';
+        }
+
+        // 4. Deploy Key automatisch eintragen
+        $publicKey = $this->sshKeyService->getPublicKey();
+        if ($provider === 'github') {
+            $deployResult = $this->hostingApi->addGitHubDeployKey($token, $repoResult['full_name'], $publicKey);
+        } else {
+            $deployResult = $this->hostingApi->addGitLabDeployKey($token, $repoResult['project_id'], $publicKey);
+        }
+
+        if (!$deployResult['success']) {
+            return GitResult::failure('Repository erstellt, aber Deploy Key konnte nicht eingetragen werden: ' . $deployResult['message']);
+        }
+        $steps[] = 'Deploy Key eingetragen (Schreibrechte)';
+
+        // 5. Git init + config + remote
+        $this->createDefaultGitignore();
+        $commands = [
+            'git init',
+            'git config user.name ' . escapeshellarg($userName),
+            'git config user.email ' . escapeshellarg($userEmail),
+            'git remote add origin ' . escapeshellarg($sshUrl),
+            'git branch -M ' . escapeshellarg($branch),
+        ];
+
+        foreach ($commands as $command) {
+            $result = $this->executor->execute($command);
+            if (!$result['success']) {
+                return GitResult::failure('Git-Konfiguration fehlgeschlagen: ' . $result['output']);
+            }
+        }
+        $steps[] = 'Lokales Repository konfiguriert';
+
+        // 6. Erster Commit + Push
+        $this->executor->execute('git add .');
+        $this->executor->execute('git commit -m "Initiales Setup via GIT Connect"');
+
+        // Kurz warten damit GitHub/GitLab den Deploy Key aktiviert hat
+        sleep(2);
+
+        $pushResult = $this->executor->execute('git push -u origin ' . escapeshellarg($branch), useLock: true);
+
+        if (!$pushResult['success']) {
+            // Zweiter Versuch nach 3 Sekunden
+            sleep(3);
+            $pushResult = $this->executor->execute('git push -u origin ' . escapeshellarg($branch), useLock: true);
+        }
+
+        if ($pushResult['success']) {
+            $steps[] = 'Erster Push erfolgreich';
+        } else {
+            $steps[] = 'Erster Push fehlgeschlagen (kann später manuell wiederholt werden)';
+        }
+
+        $this->logger?->info('Auto-setup completed', [
+            'provider' => $provider,
+            'repo' => $repoResult['full_name'] ?? $repoName,
+            'push_success' => $pushResult['success'],
+        ]);
+
+        $summary = implode("\n", array_map(fn ($s, $i) => ($i + 1) . '. ' . $s, $steps, array_keys($steps)));
+
+        if ($pushResult['success']) {
+            return GitResult::success(
+                'Repository vollständig eingerichtet! Alles ist bereit.',
+                $summary . "\n\nRepository: " . ($repoResult['html_url'] ?? $sshUrl)
+            );
+        }
+
+        return new GitResult(
+            true,
+            'Repository erstellt und konfiguriert. Der erste Push steht noch aus - versuchen Sie es gleich erneut.',
+            $summary
         );
     }
 

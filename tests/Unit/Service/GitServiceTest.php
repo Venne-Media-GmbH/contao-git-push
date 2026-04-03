@@ -29,7 +29,8 @@ class GitServiceTest extends TestCase
         $this->executor = new GitCommandExecutor($this->testDir);
         $validator = new GitInputValidator();
         $sshService = new SshKeyService($this->executor);
-        $this->service = new GitService($this->executor, $validator, $sshService);
+        $hostingApi = new \VennMedia\VmGitPushBundle\Service\GitHostingApiService();
+        $this->service = new GitService($this->executor, $validator, $sshService, $hostingApi);
     }
 
     protected function tearDown(): void
