@@ -224,12 +224,12 @@ class GitWorkflowTest extends TestCase
      */
     public function testCloneRepository(): void
     {
-        // First push something to the "server"
+        // First push something to the "server" via a temporary setup dir
         $tempSetup = dirname($this->serverDir) . '/setup';
-        mkdir($tempSetup, 0755, true);
-        $this->gitInDir($tempSetup, 'clone ' . escapeshellarg($this->serverDir) . ' .');
+        exec('git clone ' . escapeshellarg($this->serverDir) . ' ' . escapeshellarg($tempSetup) . ' 2>&1');
         $this->gitInDir($tempSetup, 'config user.name "Setup"');
         $this->gitInDir($tempSetup, 'config user.email "setup@test.com"');
+        $this->gitInDir($tempSetup, 'checkout -b main 2>/dev/null || true');
         file_put_contents($tempSetup . '/README.md', '# Test Repo');
         $this->gitInDir($tempSetup, 'add .');
         $this->gitInDir($tempSetup, 'commit -m "Initial"');
