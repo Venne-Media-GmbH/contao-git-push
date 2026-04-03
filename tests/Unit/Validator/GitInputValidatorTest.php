@@ -206,7 +206,7 @@ class GitInputValidatorTest extends TestCase
     public function testCannotDeleteProtectedBranch(): void
     {
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('geschuetzt');
+        $this->expectExceptionMessage('geschützt');
         $this->validator->validateBranchDeletion('main', 'feature/test');
     }
 

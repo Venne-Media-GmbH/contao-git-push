@@ -94,7 +94,7 @@ class SshKeyService
 
         $this->logger?->info('SSH key deleted', ['existed' => $deleted]);
 
-        return GitResult::success($deleted ? 'SSH Key geloescht' : 'Kein SSH Key vorhanden');
+        return GitResult::success($deleted ? 'SSH Key gelöscht' : 'Kein SSH Key vorhanden');
     }
 
     public function testSshConnection(string $remoteUrl): GitResult
@@ -106,7 +106,7 @@ class SshKeyService
         if (preg_match('/git@([^:]+):/', $remoteUrl, $matches)) {
             $host = $matches[1];
         } elseif (preg_match('/https?:\/\/([^\/]+)/', $remoteUrl)) {
-            return GitResult::failure('HTTPS URL erkannt. SSH Key wird nur fuer SSH URLs benoetigt.');
+            return GitResult::failure('HTTPS URL erkannt. SSH Key wird nur für SSH URLs benötigt.');
         } else {
             return GitResult::failure('Konnte Host nicht aus URL extrahieren.');
         }

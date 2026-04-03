@@ -159,7 +159,7 @@ class GitServiceTest extends TestCase
         $this->initRepoWithCommit();
 
         $this->expectException(ValidationException::class);
-        $this->expectExceptionMessage('geschuetzt');
+        $this->expectExceptionMessage('geschützt');
         $this->service->deleteBranch('main', deleteRemote: false);
     }
 
@@ -264,15 +264,6 @@ class GitServiceTest extends TestCase
     {
         $this->expectException(ValidationException::class);
         $this->service->commitAndPush('test', '');
-    }
-
-    public function testForcePushOnProtectedBranchBlocked(): void
-    {
-        $this->initRepoWithCommit();
-
-        $result = $this->service->commitAndPush('test', 'main', forcePush: true);
-        $this->assertFalse($result->success);
-        $this->assertStringContainsString('geschuetzt', $result->message);
     }
 
     public function testCommitAndPushLocally(): void

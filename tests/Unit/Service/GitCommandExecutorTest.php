@@ -62,7 +62,7 @@ class GitCommandExecutorTest extends TestCase
     {
         $this->expectException(GitException::class);
         $this->expectExceptionMessage('not allowed');
-        $this->executor->execute('git rebase main');
+        $this->executor->execute('git bisect start');
     }
 
     public function testExecuteGitInit(): void

@@ -133,7 +133,7 @@ class GitService
             $allOutput[] = $result['output'];
             if (!$result['success']) {
                 return GitResult::failure(
-                    'Fehler beim Ausfuehren: ' . $command,
+                    'Fehler beim Ausführen: ' . $command,
                     $result['output'],
                     $result['error']
                 );
@@ -291,7 +291,7 @@ class GitService
 
                 return new GitResult(
                     true,
-                    'Branch gewechselt, aber es gibt Konflikte mit den gestashten Aenderungen. Bitte manuell aufloesen.',
+                    'Branch gewechselt, aber es gibt Konflikte mit den gestashten Änderungen. Bitte manuell auflösen.',
                     $result['output'] . "\n" . $stashResult['output']
                 );
             }
@@ -335,7 +335,7 @@ class GitService
         $this->validator->validateBranchName($newName);
 
         if ($this->validator->isProtectedBranch($oldName)) {
-            return GitResult::failure('Der Branch "' . $oldName . '" ist geschuetzt und kann nicht umbenannt werden.');
+            return GitResult::failure('Der Branch "' . $oldName . '" ist geschützt und kann nicht umbenannt werden.');
         }
 
         $result = $this->executor->execute(
@@ -365,7 +365,7 @@ class GitService
         $result = $this->executor->execute('git branch -D ' . escapeshellarg($branchName));
 
         if (!$result['success']) {
-            return GitResult::failure('Fehler beim Loeschen des lokalen Branches', $result['output'], $result['error']);
+            return GitResult::failure('Fehler beim Löschen des lokalen Branches', $result['output'], $result['error']);
         }
 
         if ($deleteRemote) {
@@ -377,7 +377,7 @@ class GitService
             if (!$remoteResult['success']) {
                 return new GitResult(
                     true,
-                    'Branch lokal geloescht, aber Remote-Loeschung fehlgeschlagen',
+                    'Branch lokal gelöscht, aber Remote-Löschung fehlgeschlagen',
                     $result['output'] . "\n" . $remoteResult['output']
                 );
             }
@@ -385,7 +385,7 @@ class GitService
 
         $this->logger?->info('Branch deleted', ['branch' => $branchName, 'remote' => $deleteRemote]);
 
-        return GitResult::success('Branch "' . $branchName . '" erfolgreich geloescht', $result['output']);
+        return GitResult::success('Branch "' . $branchName . '" erfolgreich gelöscht', $result['output']);
     }
 
     // ── Remote Operations ─────────────────────────────────────────
@@ -404,7 +404,7 @@ class GitService
 
         return new GitResult(
             $result['success'],
-            $result['success'] ? 'Remote erfolgreich hinzugefuegt' : 'Fehler beim Hinzufuegen des Remote',
+            $result['success'] ? 'Remote erfolgreich hinzugefügt' : 'Fehler beim Hinzufügen des Remote',
             $result['output'],
             $result['error'] ?? ''
         );
@@ -420,7 +420,7 @@ class GitService
 
         return new GitResult(
             $result['success'],
-            $result['success'] ? 'Remote URL erfolgreich geaendert' : 'Fehler beim Aendern der Remote URL',
+            $result['success'] ? 'Remote URL erfolgreich geändert' : 'Fehler beim Ändern der Remote URL',
             $result['output'],
             $result['error'] ?? ''
         );
@@ -542,37 +542,66 @@ class GitService
 
     // ── Commit & Push ─────────────────────────────────────────────
 
-    public function commitAndPush(string $message, string $branch, bool $forcePush = false): GitResult
+    public function commitAndPush(string $message, string $branch): GitResult
     {
         $this->validator->validateCommitMessage($message);
         $this->validator->validateBranchName($branch);
 
-        if ($forcePush && $this->validator->isProtectedBranch($branch)) {
-            return GitResult::failure(
-                'Force Push auf geschuetzten Branch "' . $branch . '" ist nicht erlaubt. '
-                . 'Bitte verwenden Sie einen normalen Push oder erstellen Sie einen Pull Request.'
-            );
-        }
-
         $this->cleanIgnoredFromIndex();
 
+        // 1. Alle Änderungen stagen
         $addResult = $this->executor->execute('git add .', useLock: true);
         if (!$addResult['success']) {
             return GitResult::failure('Fehler bei git add', $addResult['output'], $addResult['error']);
         }
 
+        // 2. Commit
         $commitResult = $this->executor->execute('git commit -m ' . escapeshellarg($message), useLock: true);
         if (!$commitResult['success'] && !str_contains($commitResult['output'], 'nothing to commit')) {
             return GitResult::failure('Fehler bei git commit', $commitResult['output'], $commitResult['error']);
         }
 
-        $forceFlag = $forcePush ? ' --force-with-lease' : '';
+        // 3. Zuerst Remote-Änderungen holen und unseren Commit oben drauf setzen (Rebase)
+        //    Das sorgt dafür, dass Entwickler-Änderungen und CMS-Änderungen sauber zusammengeführt werden.
+        $this->executor->execute('git fetch origin', useLock: true);
+
+        $remoteCheck = $this->executor->execute('git rev-list HEAD..origin/' . escapeshellarg($branch) . ' --count');
+        $behindCount = $remoteCheck['success'] ? (int) trim($remoteCheck['output']) : 0;
+
+        if ($behindCount > 0) {
+            $this->logger?->info('Remote has newer changes, rebasing before push', [
+                'branch' => $branch,
+                'behind' => $behindCount,
+            ]);
+
+            $pullResult = $this->executor->execute(
+                'git pull --rebase origin ' . escapeshellarg($branch),
+                useLock: true
+            );
+
+            if (!$pullResult['success']) {
+                // Rebase-Konflikt: automatisch abbrechen, damit nichts kaputt geht
+                $this->executor->execute('git rebase --abort');
+                $this->logger?->warning('Rebase conflict detected', ['branch' => $branch]);
+
+                return GitResult::failure(
+                    'Es gibt Konflikte zwischen Ihren Änderungen und denen des Entwicklers. '
+                    . 'Die gleiche Datei wurde an der gleichen Stelle geändert. '
+                    . 'Bitte kontaktieren Sie den Entwickler, um dies aufzulösen.',
+                    $commitResult['output'] . "\n" . $pullResult['output'],
+                    $pullResult['error']
+                );
+            }
+        }
+
+        // 4. Push
         $pushResult = $this->executor->execute(
-            'git push' . $forceFlag . ' origin ' . escapeshellarg($branch),
+            'git push origin ' . escapeshellarg($branch),
             useLock: true
         );
 
-        if (!$pushResult['success'] && !$forcePush) {
+        // Falls Branch noch nicht auf Remote existiert
+        if (!$pushResult['success']) {
             $pushResult = $this->executor->execute(
                 'git push --set-upstream origin ' . escapeshellarg($branch),
                 useLock: true
@@ -582,23 +611,23 @@ class GitService
         if (!$pushResult['success']) {
             $this->logger?->error('Push failed', [
                 'branch' => $branch,
-                'forcePush' => $forcePush,
                 'output' => mb_substr($pushResult['output'], 0, 500),
             ]);
 
             return GitResult::failure(
-                'Push fehlgeschlagen. Moegliche Ursache: Remote hat neuere Aenderungen. Bitte zuerst Pull ausfuehren.',
+                'Push fehlgeschlagen. Bitte versuchen Sie es erneut oder kontaktieren Sie den Entwickler.',
                 $commitResult['output'] . "\n" . $pushResult['output'],
                 $pushResult['error']
             );
         }
 
-        $this->logger?->info('Commit and push successful', ['branch' => $branch, 'force' => $forcePush]);
+        $this->logger?->info('Commit and push successful', ['branch' => $branch]);
 
-        return GitResult::success(
-            'Commit und Push erfolgreich',
-            $commitResult['output'] . "\n" . $pushResult['output']
-        );
+        $syncMsg = $behindCount > 0
+            ? 'Änderungen erfolgreich gespeichert! (' . $behindCount . ' Änderung(en) vom Entwickler wurden automatisch zusammengeführt)'
+            : 'Änderungen erfolgreich gespeichert und synchronisiert!';
+
+        return GitResult::success($syncMsg, $commitResult['output'] . "\n" . $pushResult['output']);
     }
 
     // ── Pull ──────────────────────────────────────────────────────
@@ -627,7 +656,7 @@ class GitService
 
             throw new GitConflictException(
                 'Konflikte beim Pull erkannt! Der Merge wurde automatisch abgebrochen. '
-                . 'Bitte koordinieren Sie mit dem Entwickler, um die Konflikte aufzuloesen.',
+                . 'Bitte kontaktieren Sie den Entwickler, um die Konflikte aufzulösen.',
                 $result['output']
             );
         }
@@ -647,7 +676,7 @@ class GitService
 
                 return new GitResult(
                     true,
-                    'Pull erfolgreich, aber es gibt Konflikte mit lokalen Aenderungen. Bitte manuell pruefen.',
+                    'Pull erfolgreich, aber es gibt Konflikte mit lokalen Änderungen. Bitte manuell prüfen.',
                     $result['output'] . "\n" . $stashResult['output']
                 );
             }
@@ -655,7 +684,7 @@ class GitService
 
         $this->logger?->info('Pull successful', ['branch' => $branch]);
 
-        return GitResult::success('Pull erfolgreich', $result['output']);
+        return GitResult::success('Änderungen vom Server erfolgreich geholt!', $result['output']);
     }
 
     // ── Checkout / Restore ────────────────────────────────────────
@@ -693,8 +722,8 @@ class GitService
         return new GitResult(
             $result['success'],
             $result['success']
-                ? 'Zurueck zum aktuellen Stand (' . $branch . ')'
-                : 'Fehler beim Zuruecksetzen',
+                ? 'Zurück zum aktuellen Stand (' . $branch . ')'
+                : 'Fehler beim Zurücksetzen',
             $result['output'],
             $result['error'] ?? ''
         );

@@ -127,16 +127,25 @@ class GitWorkflowTest extends TestCase
     }
 
     /**
-     * Test that force push on protected branch is blocked.
+     * Test that commit+push auto-syncs with remote changes (the key workflow).
      */
-    public function testForcePushProtectedBranchBlocked(): void
+    public function testCommitPushAutoSyncsWithRemote(): void
     {
         $this->initWithFirstCommit();
 
-        file_put_contents($this->clientDir . '/test.txt', 'changed');
-        $result = $this->service->commitAndPush('Update', 'main', forcePush: true);
-        $this->assertFalse($result->success);
-        $this->assertStringContainsString('geschuetzt', $result->message);
+        // Developer pushes a change
+        $this->simulateDevPush('dev-code.php', '<?php echo "hello";', 'Add new feature');
+
+        // Contao user makes a different change locally
+        file_put_contents($this->clientDir . '/content.html', '<p>New content</p>');
+
+        // Commit & Push should auto-pull-rebase and succeed
+        $result = $this->service->commitAndPush('Content update from CMS', 'main');
+        $this->assertTrue($result->success, 'Auto-sync failed: ' . $result->output . ' ' . $result->error);
+
+        // Both files should exist
+        $this->assertFileExists($this->clientDir . '/dev-code.php');
+        $this->assertFileExists($this->clientDir . '/content.html');
     }
 
     /**

@@ -567,10 +567,10 @@
                         <input type="hidden" name="action" value="test_ssh">
                         <button type="submit" class="btn btn-small btn-info">Testen</button>
                     </form>
-                    <form method="post" style="display: inline;" onsubmit="return confirm('SSH Key loeschen?');">
+                    <form method="post" style="display: inline;" onsubmit="return confirm('SSH Key löschen?');">
                         <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
                         <input type="hidden" name="action" value="delete_ssh_key">
-                        <button type="submit" class="btn btn-small btn-danger">Loeschen</button>
+                        <button type="submit" class="btn btn-small btn-danger">Löschen</button>
                     </form>
                 </div>
             {% else %}
@@ -580,7 +580,7 @@
                     <input type="hidden" name="action" value="generate_ssh_key">
                     <button type="submit" class="btn btn-small btn-success">SSH Key generieren</button>
                 </form>
-                <span class="hint">Wird fuer Push zu GitHub/GitLab benoetigt</span>
+                <span class="hint">Wird für Push zu GitHub/GitLab benötigt</span>
             {% endif %}
         </div>
         {% endif %}
@@ -619,7 +619,7 @@
         {# Fall 1: Kein Git Repository #}
         {% if not isGitRepo %}
             <h2>Git Repository einrichten</h2>
-            <p>In diesem Verzeichnis existiert noch kein Git Repository. Waehlen Sie eine Option:</p>
+            <p>In diesem Verzeichnis existiert noch kein Git Repository. Wählen Sie eine Option:</p>
 
             {# Tab Navigation #}
             <div class="tab-nav">
@@ -728,7 +728,7 @@
 
         {# Fall 2: Git Repository ohne Remote #}
         {% elseif not hasRemote %}
-            <h2>Remote hinzufuegen</h2>
+            <h2>Remote hinzufügen</h2>
             <p>Git Repository vorhanden, aber kein Remote konfiguriert.</p>
 
             <form method="post">
@@ -741,17 +741,17 @@
                            placeholder="git@github.com:user/repo.git" required>
                 </div>
 
-                <button type="submit" class="btn btn-primary">Remote hinzufuegen</button>
+                <button type="submit" class="btn btn-primary">Remote hinzufügen</button>
             </form>
 
-        {# Fall 3: Vollstaendiges Git Repository - Side by Side Layout #}
+        {# Fall 3: Vollständiges Git Repository - Side by Side Layout #}
         {% else %}
             <div class="main-layout">
                 {# Linke Seite: Commit & Push #}
                 <div class="left-panel">
                     <h2>Git Verwaltung</h2>
 
-                    {# Repository Info mit Edit-Moeglichkeit #}
+                    {# Repository Info mit Edit-Möglichkeit #}
                     <div class="info-box" style="position: relative;">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                             <div>
@@ -762,7 +762,7 @@
                                 {% endif %}
                                 </div>
                             </div>
-                            <button type="button" class="btn btn-small btn-secondary" onclick="toggleRemoteEdit()">Aendern</button>
+                            <button type="button" class="btn btn-small btn-secondary" onclick="toggleRemoteEdit()">Ändern</button>
                         </div>
                         <div id="remote-edit-form" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid #444;">
                             <form method="post" style="display: flex; gap: 8px; align-items: flex-end;">
@@ -865,11 +865,11 @@
                                 </form>
                             </div>
 
-                            {# Branch loeschen #}
+                            {# Branch löschen #}
                             {% if branches|length > 1 %}
                             <div>
-                                <strong style="color: #aaccff; font-size: 12px;">Branch loeschen:</strong>
-                                <form method="post" style="display: flex; gap: 8px; margin-top: 5px;" onsubmit="return confirm('Branch wirklich loeschen? Dies kann nicht rueckgaengig gemacht werden!');">
+                                <strong style="color: #aaccff; font-size: 12px;">Branch löschen:</strong>
+                                <form method="post" style="display: flex; gap: 8px; margin-top: 5px;" onsubmit="return confirm('Branch wirklich löschen? Dies kann nicht rückgängig gemacht werden!');">
                                     <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
                                     <input type="hidden" name="action" value="delete_branch">
                                     <select name="branch_name" style="flex: 1; max-width: 200px;">
@@ -879,7 +879,7 @@
                                             {% endif %}
                                         {% endfor %}
                                     </select>
-                                    <button type="submit" class="btn btn-small btn-danger">Loeschen</button>
+                                    <button type="submit" class="btn btn-small btn-danger">Löschen</button>
                                 </form>
                             </div>
                             {% endif %}
@@ -922,9 +922,9 @@
                     {# Status-Anzeige #}
                     {% if status.hasChanges %}
                         <div class="status-section">
-                            <h3>Geaenderte Dateien</h3>
+                            <h3>Geänderte Dateien</h3>
                             {% if status.changes.modified %}
-                                <strong class="file-modified">Geaendert:</strong>
+                                <strong class="file-modified">Geändert:</strong>
                                 <ul class="file-list">
                                     {% for file in status.changes.modified %}
                                         <li class="file-modified">{{ file }}</li>
@@ -940,7 +940,7 @@
                                 </ul>
                             {% endif %}
                             {% if status.changes.deleted %}
-                                <strong class="file-deleted">Geloescht:</strong>
+                                <strong class="file-deleted">Gelöscht:</strong>
                                 <ul class="file-list">
                                     {% for file in status.changes.deleted %}
                                         <li class="file-deleted">{{ file }}</li>
@@ -958,7 +958,7 @@
                         </div>
                     {% else %}
                         <div class="alert alert-info">
-                            Keine Aenderungen. Arbeitsverzeichnis ist sauber.
+                            Keine Änderungen. Arbeitsverzeichnis ist sauber.
                         </div>
                     {% endif %}
 
@@ -970,7 +970,7 @@
                         <div class="form-group">
                             <label for="commit_message">Commit-Nachricht *</label>
                             <textarea id="commit_message" name="commit_message"
-                                      placeholder="Beschreiben Sie Ihre Aenderungen..." required></textarea>
+                                      placeholder="Beschreiben Sie Ihre Änderungen..." required></textarea>
                         </div>
 
                         <div class="form-group">
@@ -984,18 +984,14 @@
                             </select>
                         </div>
 
-                        <div class="form-group">
-                            <label style="display: inline; font-weight: normal;">
-                                <input type="checkbox" name="force_push" value="1" style="margin-right: 5px;">
-                                Force Push (Server-Stand ueberschreiben - Vorsicht!)
-                            </label>
-                            <div class="hint">Ohne Force Push wird ein normaler Push versucht. Bei Konflikten bitte zuerst Pull ausfuehren.</div>
+                        <div class="hint" style="margin-bottom: 10px;">
+                            Änderungen vom Entwickler werden automatisch zusammengeführt.
                         </div>
 
-                        <button type="submit" class="btn btn-primary">Commit & Push</button>
+                        <button type="submit" class="btn btn-primary">Änderungen speichern & synchronisieren</button>
                     </form>
 
-                    {# Zusaetzliche Aktionen #}
+                    {# Zusätzliche Aktionen #}
                     <div class="button-group">
                         <form method="post" style="display: inline;">
                             <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">

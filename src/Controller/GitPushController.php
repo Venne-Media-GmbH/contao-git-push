@@ -48,7 +48,7 @@ class GitPushController extends AbstractBackendController
                 $message = $e->getMessage();
                 $messageType = 'error';
             } catch (GitLockException $e) {
-                $message = 'Eine andere Git-Operation laeuft gerade. Bitte versuchen Sie es in einigen Sekunden erneut.';
+                $message = 'Eine andere Git-Operation läuft gerade. Bitte versuchen Sie es in einigen Sekunden erneut.';
                 $messageType = 'error';
             } catch (GitConflictException $e) {
                 $message = $e->getMessage();
@@ -219,9 +219,8 @@ class GitPushController extends AbstractBackendController
     {
         $commitMessage = trim($request->request->getString('commit_message'));
         $branch = trim($request->request->getString('branch', 'main'));
-        $forcePush = (bool) $request->request->get('force_push', false);
 
-        $result = $this->gitService->commitAndPush($commitMessage, $branch, $forcePush);
+        $result = $this->gitService->commitAndPush($commitMessage, $branch);
 
         return $this->formatResult($result);
     }
@@ -251,7 +250,7 @@ class GitPushController extends AbstractBackendController
         $output = $result->output;
         if ($result->success) {
             $publicKey = $this->gitService->getSshKeyService()->getPublicKey();
-            $output = "SSH Key erfolgreich generiert!\n\nPublic Key (kopieren und in GitHub/GitLab als Deploy Key hinzufuegen):\n\n" . ($publicKey ?? '');
+            $output = "SSH Key erfolgreich generiert!\n\nPublic Key (kopieren und in GitHub/GitLab als Deploy Key hinzufügen):\n\n" . ($publicKey ?? '');
         }
 
         return [

@@ -20,7 +20,7 @@ class GitCommandExecutor
     private const ALLOWED_GIT_COMMANDS = [
         'init', 'clone', 'add', 'commit', 'push', 'pull', 'fetch',
         'status', 'branch', 'checkout', 'log', 'remote', 'config',
-        'stash', 'reset', 'rm', 'rev-list', 'diff',
+        'stash', 'reset', 'rm', 'rev-list', 'diff', 'rebase', 'merge',
     ];
     private const COMMAND_TIMEOUT = 120;
 

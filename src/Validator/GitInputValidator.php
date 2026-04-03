@@ -31,12 +31,12 @@ class GitInputValidator
 
         if (!$isValidUrl) {
             throw new ValidationException(
-                'Ungueltige Remote URL. Erlaubte Formate: git@host:user/repo.git oder https://host/user/repo.git'
+                'Ungültige Remote URL. Erlaubte Formate: git@host:user/repo.git oder https://host/user/repo.git'
             );
         }
 
         if (str_contains($url, '..') || str_contains($url, '~')) {
-            throw new ValidationException('Remote URL enthaelt unerlaubte Zeichen.');
+            throw new ValidationException('Remote URL enthält unerlaubte Zeichen.');
         }
     }
 
@@ -54,12 +54,12 @@ class GitInputValidator
 
         if (!preg_match(self::BRANCH_NAME_PATTERN, $name)) {
             throw new ValidationException(
-                'Ungueltiger Branch-Name. Erlaubt: Buchstaben, Zahlen, -, _, /, . (muss mit Buchstabe/Zahl beginnen)'
+                'Ungültiger Branch-Name. Erlaubt: Buchstaben, Zahlen, -, _, /, . (muss mit Buchstabe/Zahl beginnen)'
             );
         }
 
         if (str_contains($name, '..') || str_contains($name, '~') || str_contains($name, '^') || str_contains($name, ':')) {
-            throw new ValidationException('Branch-Name enthaelt unerlaubte Zeichenkombinationen.');
+            throw new ValidationException('Branch-Name enthält unerlaubte Zeichenkombinationen.');
         }
 
         if (str_ends_with($name, '.lock') || str_ends_with($name, '/')) {
@@ -76,7 +76,7 @@ class GitInputValidator
         }
 
         if (!preg_match(self::COMMIT_HASH_PATTERN, $hash)) {
-            throw new ValidationException('Ungueltiger Commit Hash. Muss 7-40 Hex-Zeichen enthalten.');
+            throw new ValidationException('Ungültiger Commit Hash. Muss 7-40 Hex-Zeichen enthalten.');
         }
     }
 
@@ -115,7 +115,7 @@ class GitInputValidator
         }
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new ValidationException('Ungueltige E-Mail-Adresse.');
+            throw new ValidationException('Ungültige E-Mail-Adresse.');
         }
     }
 
@@ -129,12 +129,12 @@ class GitInputValidator
         $this->validateBranchName($branchName);
 
         if (trim($branchName) === trim($currentBranch)) {
-            throw new ValidationException('Der aktive Branch kann nicht geloescht werden.');
+            throw new ValidationException('Der aktive Branch kann nicht gelöscht werden.');
         }
 
         if ($this->isProtectedBranch($branchName)) {
             throw new ValidationException(
-                'Der Branch "' . $branchName . '" ist geschuetzt und kann nicht geloescht werden.'
+                'Der Branch "' . $branchName . '" ist geschützt und kann nicht gelöscht werden.'
             );
         }
     }
