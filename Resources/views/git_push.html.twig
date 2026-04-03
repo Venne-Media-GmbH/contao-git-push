@@ -1138,6 +1138,75 @@
                     }
                     </script>
 
+                    {# .gitignore Konfiguration #}
+                    {% if gitignoreState is defined %}
+                    <div class="branch-section">
+                        <h3>.gitignore
+                            <button type="button" class="btn btn-small btn-secondary" onclick="toggleGitignore()" style="margin-left: 10px; font-size: 10px;">Bearbeiten</button>
+                        </h3>
+                        <div id="gitignore-editor" style="display: none;">
+                            {# Tab-Umschalter: Einfach / Experte #}
+                            <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                                <button type="button" class="btn btn-small btn-info" onclick="showGitignoreTab('simple')" id="gi-tab-simple">Einfach</button>
+                                <button type="button" class="btn btn-small btn-secondary" onclick="showGitignoreTab('raw')" id="gi-tab-raw">Experte (Freitext)</button>
+                            </div>
+
+                            {# Einfach: Checkboxen #}
+                            <div id="gitignore-simple">
+                                <form method="post">
+                                    <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                                    <input type="hidden" name="action" value="save_gitignore">
+                                    <p style="color: #888; font-size: 11px; margin: 0 0 8px 0;">
+                                        Angehakte Verzeichnisse werden <strong>nicht</strong> ins Repository aufgenommen (ignoriert).
+                                    </p>
+                                    <div class="gitignore-list">
+                                        {% for path, info in gitignoreState %}
+                                        <div class="gitignore-item">
+                                            <label>
+                                                <input type="checkbox" name="ignore_paths[]" value="{{ path }}"
+                                                       {% if info.ignored %}checked{% endif %}>
+                                                <span>
+                                                    <span class="path-name">{{ info.label }}</span>
+                                                    <span class="path-desc">{{ info.description }}</span>
+                                                </span>
+                                            </label>
+                                            {% if info.exists %}
+                                                <span class="path-exists">vorhanden</span>
+                                            {% else %}
+                                                <span class="path-missing">nicht vorhanden</span>
+                                            {% endif %}
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    <button type="submit" class="btn btn-small btn-primary" style="margin-top: 10px;">Speichern</button>
+                                </form>
+                            </div>
+
+                            {# Experte: Freitext #}
+                            <div id="gitignore-raw" style="display: none;">
+                                <form method="post">
+                                    <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                                    <input type="hidden" name="action" value="save_gitignore_raw">
+                                    <textarea name="gitignore_content" style="width: 100%; min-height: 200px; font-family: monospace; font-size: 12px; background: #0d0d0d; color: #0f0; border: 1px solid #333; padding: 8px; border-radius: 4px;">{{ gitignoreRaw }}</textarea>
+                                    <button type="submit" class="btn btn-small btn-primary" style="margin-top: 10px;">Speichern</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                    function toggleGitignore() {
+                        var editor = document.getElementById('gitignore-editor');
+                        editor.style.display = editor.style.display === 'none' ? 'block' : 'none';
+                    }
+                    function showGitignoreTab(tab) {
+                        document.getElementById('gitignore-simple').style.display = tab === 'simple' ? 'block' : 'none';
+                        document.getElementById('gitignore-raw').style.display = tab === 'raw' ? 'block' : 'none';
+                        document.getElementById('gi-tab-simple').className = 'btn btn-small ' + (tab === 'simple' ? 'btn-info' : 'btn-secondary');
+                        document.getElementById('gi-tab-raw').className = 'btn btn-small ' + (tab === 'raw' ? 'btn-info' : 'btn-secondary');
+                    }
+                    </script>
+                    {% endif %}
+
                     {# Letzter Commit #}
                     {% if lastCommit.success %}
                         <div class="commit-info">

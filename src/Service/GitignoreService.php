@@ -229,6 +229,85 @@ class GitignoreService
         return file_exists($this->projectRoot . '/.gitignore');
     }
 
+    /**
+     * Liest den Inhalt der aktuellen .gitignore.
+     */
+    public function getGitignoreContent(): string
+    {
+        $path = $this->projectRoot . '/.gitignore';
+        if (!file_exists($path)) {
+            return '';
+        }
+
+        return file_get_contents($path);
+    }
+
+    /**
+     * Speichert den Inhalt der .gitignore direkt (Freitext-Editor).
+     */
+    public function saveGitignoreContent(string $content): void
+    {
+        $path = $this->projectRoot . '/.gitignore';
+        file_put_contents($path, $content);
+    }
+
+    /**
+     * Parst die aktuelle .gitignore und gibt die aktiven Pfade zurück,
+     * zusammen mit dem konfigurierbaren Status (Checkbox-Darstellung).
+     *
+     * @return array<string, array{label: string, description: string, ignored: bool, exists: bool}>
+     */
+    public function getCurrentIgnoreState(): array
+    {
+        $currentContent = $this->getGitignoreContent();
+        $currentLines = array_map('trim', explode("\n", $currentContent));
+
+        $result = [];
+
+        // Bekannte Pfade mit aktuellem Status
+        foreach (self::KNOWN_PATHS as $path => $info) {
+            $fullPath = $this->projectRoot . $path;
+            $exists = file_exists(rtrim($fullPath, '/'));
+            $isIgnored = in_array($path, $currentLines, true)
+                || in_array(ltrim($path, '/'), $currentLines, true);
+
+            $result[$path] = [
+                'label' => $info['label'],
+                'description' => $info['description'],
+                'ignored' => $isIgnored,
+                'exists' => $exists,
+            ];
+        }
+
+        // Unbekannte Verzeichnisse im Root
+        $rootDirs = $this->scanRootDirectories();
+        foreach ($rootDirs as $dir) {
+            $path = '/' . $dir . '/';
+            if (!isset($result[$path]) && !$this->isAlwaysIgnored($path)) {
+                $isIgnored = in_array($path, $currentLines, true)
+                    || in_array($dir . '/', $currentLines, true)
+                    || in_array('/' . $dir . '/', $currentLines, true);
+
+                $result[$path] = [
+                    'label' => $dir . '/',
+                    'description' => 'Verzeichnis im Projektordner',
+                    'ignored' => $isIgnored,
+                    'exists' => true,
+                ];
+            }
+        }
+
+        // Sortieren: existierende zuerst
+        uasort($result, function ($a, $b) {
+            if ($a['exists'] !== $b['exists']) {
+                return $b['exists'] <=> $a['exists'];
+            }
+            return strcmp($a['label'], $b['label']);
+        });
+
+        return $result;
+    }
+
     private function scanRootDirectories(): array
     {
         $dirs = [];

@@ -102,6 +102,8 @@ class GitPushController extends AbstractBackendController
             'generate_ssh_key' => $this->handleGenerateSshKey(),
             'delete_ssh_key' => $this->handleDeleteSshKey(),
             'test_ssh' => $this->handleTestSsh(),
+            'save_gitignore' => $this->handleSaveGitignore($request),
+            'save_gitignore_raw' => $this->handleSaveGitignoreRaw($request),
             'checkout_commit' => $this->handleCheckoutCommit($request),
             'checkout_latest' => $this->handleCheckoutLatest(),
             'switch_branch' => $this->handleSwitchBranch($request),
@@ -162,6 +164,9 @@ class GitPushController extends AbstractBackendController
             $templateData['commitHistory'] = array_map(fn ($c) => $c->toArray(), $commits);
 
             $templateData['remoteStatus'] = $this->gitService->getRemoteStatus()->toArray();
+            $gitignoreService = $this->gitService->getGitignoreService();
+            $templateData['gitignoreState'] = $gitignoreService->getCurrentIgnoreState();
+            $templateData['gitignoreRaw'] = $gitignoreService->getGitignoreContent();
         }
 
         return $templateData;
@@ -253,6 +258,28 @@ class GitPushController extends AbstractBackendController
         $result = $this->gitService->commitAndPush($commitMessage, $branch);
 
         return $this->formatResult($result);
+    }
+
+    private function handleSaveGitignore(Request $request): array
+    {
+        $ignorePaths = $request->request->all('ignore_paths');
+        $this->gitService->getGitignoreService()->createGitignore($ignorePaths);
+
+        return [
+            'message' => '.gitignore erfolgreich gespeichert.',
+            'type' => 'success',
+        ];
+    }
+
+    private function handleSaveGitignoreRaw(Request $request): array
+    {
+        $content = $request->request->getString('gitignore_content');
+        $this->gitService->getGitignoreService()->saveGitignoreContent($content);
+
+        return [
+            'message' => '.gitignore erfolgreich gespeichert.',
+            'type' => 'success',
+        ];
     }
 
     private function handleInitialPush(): array
