@@ -673,8 +673,10 @@
 
             {# Init Tab - Neues Repo #}
             <div id="tab-init" class="tab-content">
-                <div class="alert alert-warning">
-                    <strong>Hinweis:</strong> Dies erstellt ein neues, leeres Repository. Verwenden Sie dies nur, wenn Sie ein neues Projekt starten.
+                <div class="alert alert-info">
+                    <strong>Neues Repository:</strong> Das System erstellt automatisch ein Git Repository,
+                    generiert einen SSH Key und macht den ersten Commit.
+                    Sie müssen danach nur noch den SSH Key in GitHub/GitLab eintragen.
                 </div>
 
                 <form method="post">
@@ -682,10 +684,12 @@
                     <input type="hidden" name="action" value="init">
 
                     <div class="form-group">
-                        <label for="init_remote_url">Remote URL (SSH oder HTTPS) *</label>
+                        <label for="init_remote_url">Remote URL (SSH) *</label>
                         <input type="text" id="init_remote_url" name="remote_url"
                                placeholder="git@github.com:user/repo.git" required>
-                        <div class="hint">Beispiel: git@github.com:username/repository.git</div>
+                        <div class="hint">
+                            Erstellen Sie zuerst ein leeres Repository auf GitHub/GitLab und kopieren Sie die SSH-URL hierher.
+                        </div>
                     </div>
 
                     <div class="form-row">
@@ -707,7 +711,7 @@
                         <input type="text" id="init_branch" name="branch" value="main" placeholder="main">
                     </div>
 
-                    <button type="submit" class="btn btn-primary">Repository initialisieren</button>
+                    <button type="submit" class="btn btn-primary">Repository einrichten</button>
                 </form>
             </div>
 

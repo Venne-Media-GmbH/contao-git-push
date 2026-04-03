@@ -115,6 +115,7 @@ class GitService
             $this->validator->validateUserEmail($userEmail);
         }
 
+        // 1. Git init + Konfiguration
         $this->createDefaultGitignore();
 
         $commands = ['git init'];
@@ -140,9 +141,49 @@ class GitService
             }
         }
 
+        // 2. SSH Key automatisch generieren (falls SSH-URL und noch kein Key vorhanden)
+        $sshKeyGenerated = false;
+        if (str_contains($remoteUrl, 'git@') && !$this->sshKeyService->hasSshKey()) {
+            $sshResult = $this->sshKeyService->generateSshKey();
+            $sshKeyGenerated = $sshResult->success;
+        }
+
+        // 3. Ersten Commit erstellen
+        $this->executor->execute('git add .');
+        $this->executor->execute('git commit -m "Initiales Setup via GIT Connect"');
+
         $this->logger?->info('Repository initialized', ['remote' => $remoteUrl, 'branch' => $branch]);
 
-        return GitResult::success('Repository erfolgreich initialisiert', implode("\n", $allOutput));
+        // 4. Push versuchen
+        $pushResult = $this->executor->execute('git push -u origin ' . escapeshellarg($branch), useLock: true);
+
+        if ($pushResult['success']) {
+            return GitResult::success(
+                'Repository erfolgreich eingerichtet und erster Push durchgeführt!',
+                implode("\n", $allOutput)
+            );
+        }
+
+        // Push fehlgeschlagen - wahrscheinlich muss noch der Deploy Key eingetragen werden
+        if ($sshKeyGenerated) {
+            $publicKey = $this->sshKeyService->getPublicKey();
+            $deployUrl = $this->sshKeyService->getDeployKeyUrl($remoteUrl);
+
+            $hint = "Repository eingerichtet! Der erste Push steht noch aus.\n\n";
+            $hint .= "Nächster Schritt: Tragen Sie diesen SSH Key als Deploy Key (mit Schreibrechten) ein:\n\n";
+            $hint .= $publicKey . "\n\n";
+            if ($deployUrl) {
+                $hint .= "Link: " . $deployUrl . "\n\n";
+            }
+            $hint .= "Klicken Sie danach auf \"Änderungen speichern & synchronisieren\".";
+
+            return new GitResult(true, 'Repository eingerichtet! SSH Key muss noch hinterlegt werden.', $hint);
+        }
+
+        return GitResult::success(
+            'Repository eingerichtet. Erster Push konnte nicht durchgeführt werden - bitte manuell pushen.',
+            implode("\n", $allOutput) . "\n" . $pushResult['output']
+        );
     }
 
     public function cloneRepository(string $remoteUrl, string $branch = 'main', ?string $userName = null, ?string $userEmail = null): GitResult
