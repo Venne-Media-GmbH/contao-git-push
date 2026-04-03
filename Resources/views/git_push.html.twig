@@ -748,7 +748,56 @@
                 <button type="submit" class="btn btn-primary">Remote hinzufügen</button>
             </form>
 
-        {# Fall 3: Vollständiges Git Repository - Side by Side Layout #}
+        {# Fall 3: Initialer Push steht noch aus (nach neuem Repo erstellen) #}
+        {% elseif hasNeverPushed is defined and hasNeverPushed %}
+            <h2>Repository eingerichtet - Erster Push ausstehend</h2>
+
+            <div class="alert alert-warning">
+                <strong>Fast geschafft!</strong> Das Repository ist lokal eingerichtet.
+                Damit der erste Push funktioniert, müssen Sie den SSH Key als Deploy Key in GitHub/GitLab eintragen.
+            </div>
+
+            {% if hasSshKey and sshPublicKey %}
+            <div class="config-section">
+                <h3>Schritt 1: SSH Key als Deploy Key eintragen</h3>
+                <p style="color: #ccc;">Kopieren Sie den folgenden Key und tragen Sie ihn in Ihrem Repository als <strong>Deploy Key mit Schreibrechten</strong> ein:</p>
+                <div class="output-box" style="cursor: pointer;" onclick="navigator.clipboard.writeText('{{ sshPublicKey }}'); alert('Key kopiert!');" title="Klicken zum Kopieren">{{ sshPublicKey }}</div>
+                {% if deployKeyUrl %}
+                <p><a href="{{ deployKeyUrl }}" target="_blank" class="btn btn-success" style="text-decoration: none;">Deploy Key in GitHub/GitLab eintragen</a></p>
+                {% endif %}
+            </div>
+
+            <div class="config-section">
+                <h3>Schritt 2: Ersten Push durchführen</h3>
+                <p style="color: #ccc;">Nachdem Sie den Deploy Key eingetragen haben, klicken Sie hier:</p>
+                <form method="post">
+                    <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                    <input type="hidden" name="action" value="initial_push">
+                    <button type="submit" class="btn btn-primary">Ersten Push durchführen</button>
+                </form>
+            </div>
+            {% else %}
+            <div class="config-section">
+                <h3>SSH Key generieren</h3>
+                <p style="color: #ccc;">Es wurde noch kein SSH Key generiert. Bitte zuerst einen Key erstellen:</p>
+                <form method="post">
+                    <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                    <input type="hidden" name="action" value="generate_ssh_key">
+                    <button type="submit" class="btn btn-success">SSH Key generieren</button>
+                </form>
+            </div>
+            {% endif %}
+
+            <div class="config-section">
+                <h3>SSH Verbindung testen</h3>
+                <form method="post" style="display: inline;">
+                    <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                    <input type="hidden" name="action" value="test_ssh">
+                    <button type="submit" class="btn btn-info">Verbindung testen</button>
+                </form>
+            </div>
+
+        {# Fall 4: Vollständiges Git Repository - Side by Side Layout #}
         {% else %}
             <div class="main-layout">
                 {# Linke Seite: Commit & Push #}

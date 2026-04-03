@@ -95,6 +95,7 @@ class GitPushController extends AbstractBackendController
             'change_remote_url' => $this->handleChangeRemoteUrl($request),
             'config_user' => $this->handleConfigUser($request),
             'commit_push' => $this->handleCommitAndPush($request),
+            'initial_push' => $this->handleInitialPush(),
             'pull' => $this->handlePull(),
             'status' => $this->handleStatus(),
             'generate_ssh_key' => $this->handleGenerateSshKey(),
@@ -138,6 +139,7 @@ class GitPushController extends AbstractBackendController
         }
 
         if ($isGitRepo && $hasRemote) {
+            $templateData['hasNeverPushed'] = $this->gitService->hasNeverPushed();
             $templateData['branches'] = $this->gitService->getBranches();
             $templateData['remoteBranches'] = $this->gitService->getRemoteBranches();
             $templateData['currentBranch'] = $this->gitService->getCurrentBranch();
@@ -221,6 +223,13 @@ class GitPushController extends AbstractBackendController
         $branch = trim($request->request->getString('branch', 'main'));
 
         $result = $this->gitService->commitAndPush($commitMessage, $branch);
+
+        return $this->formatResult($result);
+    }
+
+    private function handleInitialPush(): array
+    {
+        $result = $this->gitService->initialPush();
 
         return $this->formatResult($result);
     }

@@ -474,6 +474,46 @@ class GitService
         return new GitResult($result['success'], '', $result['output'], $result['error'] ?? '');
     }
 
+    /**
+     * Prüft ob der Branch noch nie zum Remote gepusht wurde (initialer Push ausständig).
+     */
+    public function hasNeverPushed(): bool
+    {
+        if (!$this->isGitRepository() || !$this->hasRemote()) {
+            return false;
+        }
+
+        $branch = $this->getCurrentBranch();
+        $result = $this->executor->execute('git rev-parse --verify origin/' . escapeshellarg($branch));
+
+        return !$result['success'];
+    }
+
+    /**
+     * Führt den initialen Push durch (nach dem der Deploy Key eingetragen wurde).
+     */
+    public function initialPush(): GitResult
+    {
+        $branch = $this->getCurrentBranch();
+
+        $pushResult = $this->executor->execute(
+            'git push -u origin ' . escapeshellarg($branch),
+            useLock: true
+        );
+
+        if ($pushResult['success']) {
+            $this->logger?->info('Initial push successful', ['branch' => $branch]);
+
+            return GitResult::success('Erster Push erfolgreich! Das Repository ist jetzt vollständig eingerichtet.');
+        }
+
+        return GitResult::failure(
+            'Push fehlgeschlagen. Bitte prüfen Sie, ob der SSH Key korrekt als Deploy Key (mit Schreibrechten!) eingetragen ist.',
+            $pushResult['output'],
+            $pushResult['error']
+        );
+    }
+
     // ── Status & Info ─────────────────────────────────────────────
 
     public function getStatus(): GitStatus
